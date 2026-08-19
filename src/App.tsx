@@ -12,6 +12,8 @@ import { UserAccountModal } from './components/UserAccountModal';
 import { OrderTrackLookup } from './components/OrderTrackLookup';
 import { WhatsAppWidget } from './components/WhatsAppWidget';
 import { Footer } from './components/Footer';
+import { supabase } from './lib/supabase';
+
 
 import { 
   Product, 
@@ -21,46 +23,169 @@ import {
   UserProfile, 
   ProductCategory, 
   CustomizationDetails, 
-  OrderStatus 
+  OrderStatus,
+  Review
 } from './types';
-import { INITIAL_PRODUCTS, INITIAL_ORDERS, INITIAL_BESPOKE_REQUESTS } from './data/initialProducts';
 import { generateWhatsAppLink } from './utils/formatters';
 
+const mapProductRow = (item: any): Product => ({
+  id: String(item.id ?? ''),
+  sku: item.sku || `SKU-${String(item.id ?? 'product').slice(0, 8)}`,
+  name: item.name ?? '',
+  tagline: item.tagline ?? '',
+  category: (item.category as ProductCategory) || 'sarees',
+  subcategory: item.subcategory ?? '',
+  price: Number(item.price) || 0,
+  originalPrice: item.original_price == null ? undefined : Number(item.original_price),
+  images: item.images?.length ? item.images : item.image_url ? [item.image_url] : [],
+  fabric: item.fabric ?? '',
+  color: item.color ?? '',
+  colorHex: item.color_hex ?? '#000000',
+  occasion: item.occasion ?? '',
+  description: item.description ?? '',
+  craftDetails: item.craft_details ?? [],
+  careInstructions: item.care_instructions ?? '',
+  availableSizes: item.available_sizes ?? [],
+  inStock: item.in_stock ?? true,
+  stockCount: Number(item.stock_count) || 0,
+  isBestSeller: item.is_best_seller ?? false,
+  isNewArrival: item.is_new_arrival ?? false,
+  isCustomizable: item.is_customizable ?? false,
+  rating: Number(item.rating) || 0,
+  reviewCount: Number(item.review_count) || 0,
+  reviews: (item.reviews ?? []).map((review: any): Review => ({
+    id: review.id,
+    author: review.author ?? '',
+    rating: Number(review.rating) || 0,
+    date: review.date ?? review.created_at ?? '',
+    comment: review.comment ?? '',
+    verified: review.verified ?? false,
+    location: review.location ?? undefined,
+  })),
+  customizationBasePrice: item.customization_base_price == null ? undefined : Number(item.customization_base_price),
+  isActive: item.is_active ?? true,
+});
+
+const mapOrderRow = (row: any): Order => ({
+  id: row.id,
+  orderNumber: row.order_number,
+  date: row.order_date || row.created_at,
+  customer: row.customer ?? {},
+  items: (row.order_items ?? []).map((item: any): CartItem => ({
+    id: item.id,
+    productId: item.product_id,
+    product: mapProductRow(item.product_snapshot ?? {}),
+    selectedSize: item.selected_size,
+    selectedColor: item.selected_color,
+    quantity: item.quantity,
+    isCustomized: item.is_customized,
+    customization: item.customization ?? undefined,
+    customizationFee: Number(item.customization_fee) || 0,
+    itemTotal: Number(item.item_total) || 0,
+  })),
+  subtotal: Number(row.subtotal) || 0,
+  discount: Number(row.discount) || 0,
+  couponCode: row.coupon_code ?? undefined,
+  shippingFee: Number(row.shipping_fee) || 0,
+  totalAmount: Number(row.total_amount) || 0,
+  paymentMethod: row.payment_method,
+  paymentStatus: row.payment_status,
+  orderStatus: row.order_status,
+  trackingNumber: row.tracking_number ?? undefined,
+  courierPartner: row.courier_partner ?? undefined,
+  estimatedDelivery: row.estimated_delivery ?? '',
+  whatsappUpdates: row.whatsapp_updates ?? false,
+  notes: row.notes ?? undefined,
+  timeline: row.timeline ?? [],
+});
+
+const mapBespokeRow = (row: any): BespokeRequest => ({
+  id: row.id,
+  requestNumber: row.request_number,
+  customerName: row.customer_name,
+  email: row.email,
+  phone: row.phone,
+  category: row.category,
+  fabricPreference: row.fabric_preference,
+  budgetRange: row.budget_range,
+  targetDate: row.target_date,
+  description: row.description,
+  referenceImages: row.reference_images ?? [],
+  measurements: row.measurements ?? {},
+  status: row.status,
+  createdAt: row.created_at,
+  notes: row.notes ?? undefined,
+});
+
+const sendBusinessEmail = async (event: string, to: string, subject: string, text: string) => {
+  const { error } = await supabase.functions.invoke('send-business-email', {
+    body: { event, to, subject, text },
+  });
+  if (error) console.error(`Failed to send ${event} email:`, error);
+};
+
 export default function App() {
-  // 1. Persistent Products State
-  const [products, setProducts] = useState<Product[]>(() => {
-    try {
-      const saved = localStorage.getItem('aura_loom_products');
-      return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
-    } catch {
-      return INITIAL_PRODUCTS;
-    }
-  });
+  // 1. Products State - loaded from Supabase
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isProductsLoading, setIsProductsLoading] = useState(true);
 
-  // 2. Persistent Orders State
-  const [orders, setOrders] = useState<Order[]>(() => {
-    try {
-      const saved = localStorage.getItem('aura_loom_orders');
-      return saved ? JSON.parse(saved) : INITIAL_ORDERS;
-    } catch {
-      return INITIAL_ORDERS;
-    }
-  });
+  const loadProducts = async () => {
+    setIsProductsLoading(true);
+    const { data, error } = await supabase.from('products').select('*, reviews(*)');
 
-  // 3. Persistent Bespoke Custom Tailoring Requests
-  const [bespokeRequests, setBespokeRequests] = useState<BespokeRequest[]>(() => {
-    try {
-      const saved = localStorage.getItem('aura_loom_bespoke_requests');
-      return saved ? JSON.parse(saved) : INITIAL_BESPOKE_REQUESTS;
-    } catch {
-      return INITIAL_BESPOKE_REQUESTS;
+    if (error) {
+      console.error('Failed to load products:', error);
+      setProducts([]);
+      setIsProductsLoading(false);
+      return;
     }
-  });
+
+    setProducts((data ?? []).map(mapProductRow));
+    setIsProductsLoading(false);
+  };
+
+  useEffect(() => {
+    loadProducts();
+  }, []);
+  // 2. Orders State - loaded from Supabase
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [isOrdersLoading, setIsOrdersLoading] = useState(true);
+
+  const loadOrders = async () => {
+    setIsOrdersLoading(true);
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*, order_items(*)')
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('Failed to load orders:', error);
+      setOrders([]);
+    } else {
+      setOrders((data ?? []).map(mapOrderRow));
+    }
+    setIsOrdersLoading(false);
+  };
+
+  // 3. Bespoke Requests State - loaded from Supabase
+  const [bespokeRequests, setBespokeRequests] = useState<BespokeRequest[]>([]);
+
+  const loadBespokeRequests = async () => {
+    const { data, error } = await supabase
+      .from('bespoke_requests')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('Failed to load bespoke requests:', error);
+      setBespokeRequests([]);
+    } else {
+      setBespokeRequests((data ?? []).map(mapBespokeRow));
+    }
+  };
 
   // 4. Persistent Shopping Bag
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
-      const saved = localStorage.getItem('aura_loom_cart');
+      const saved = localStorage.getItem('Bhuvisrienterprises_cart');
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -68,67 +193,99 @@ export default function App() {
   });
 
   // 5. Persistent Wishlist
-  const [wishlist, setWishlist] = useState<Product[]>(() => {
-    try {
-      const saved = localStorage.getItem('aura_loom_wishlist');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [wishlist, setWishlist] = useState<Product[]>([]);
 
   // 6. User Profile & Admin Auth
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
-    try {
-      const saved = localStorage.getItem('aura_loom_user');
-      return saved ? JSON.parse(saved) : {
-        id: 'usr-priya',
-        name: 'Priya Sharma',
-        email: 'priya@example.com',
-        phone: '+91 98765 43210',
-        role: 'customer',
-      };
-    } catch {
-      return null;
-    }
-  });
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => {
-    return localStorage.getItem('aura_loom_admin_active') === 'true';
-  });
-
-  // Sync to local storage
-  useEffect(() => {
-    localStorage.setItem('aura_loom_products', JSON.stringify(products));
-  }, [products]);
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem('aura_loom_orders', JSON.stringify(orders));
-  }, [orders]);
+    let isMounted = true;
+
+    const applySupabaseSession = (session: { user: { id: string; email?: string; user_metadata?: Record<string, unknown> } } | null) => {
+      if (!isMounted) return;
+
+      if (!session?.user) {
+        setCurrentUser(null);
+        setIsAdminLoggedIn(false);
+        setWishlist([]);
+        return;
+      }
+
+      const metadata = session.user.user_metadata ?? {};
+      supabase.from('user_profiles').select('id, name, email, phone, role').eq('id', session.user.id).maybeSingle().then(async ({ data, error }) => {
+        if (error) {
+          console.error('Failed to load user profile:', error);
+          return;
+        }
+
+        const profile = data ?? (await supabase.from('user_profiles').insert({
+          id: session.user.id,
+          name: String(metadata.full_name ?? metadata.name ?? session.user.email?.split('@')[0] ?? 'Valued Client'),
+          email: session.user.email ?? '',
+          phone: String(metadata.phone ?? ''),
+        }).select('id, name, email, phone, role').single()).data;
+
+        if (!profile) return;
+
+        // admin_users membership is the single source of truth for admin access (kept in sync with handleAdminLogin).
+        const { data: adminRow } = await supabase
+          .from('admin_users')
+          .select('user_id')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+        const isAdmin = Boolean(adminRow);
+
+        setCurrentUser({
+          id: profile.id,
+          name: profile.name,
+          email: profile.email,
+          phone: profile.phone,
+          role: isAdmin ? 'admin' : 'customer',
+        });
+        setIsAdminLoggedIn(isAdmin);
+      });
+
+      supabase.from('wishlist').select('product_id, products(*)').eq('user_id', session.user.id).then(({ data, error }) => {
+        if (error) {
+          console.error('Failed to load wishlist:', error);
+          return;
+        }
+        setWishlist((data ?? []).map((item: any) => mapProductRow(item.products)));
+      });
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      applySupabaseSession(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        applySupabaseSession(session);
+      } else if (isMounted) {
+        setCurrentUser(null);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem('aura_loom_bespoke_requests', JSON.stringify(bespokeRequests));
-  }, [bespokeRequests]);
-
-  useEffect(() => {
-    localStorage.setItem('aura_loom_cart', JSON.stringify(cart));
-  }, [cart]);
-
-  useEffect(() => {
-    localStorage.setItem('aura_loom_wishlist', JSON.stringify(wishlist));
-  }, [wishlist]);
-
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('aura_loom_user', JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem('aura_loom_user');
-    }
+    if (currentUser) loadOrders();
   }, [currentUser]);
 
   useEffect(() => {
-    localStorage.setItem('aura_loom_admin_active', String(isAdminLoggedIn));
-  }, [isAdminLoggedIn]);
+    if (currentUser) loadBespokeRequests();
+  }, [currentUser]);
+
+  // Cart is temporary browser UI state; business records are stored in Supabase.
+  useEffect(() => {
+    localStorage.setItem('Bhuvisrienterprises_cart', JSON.stringify(cart));
+  }, [cart]);
 
   // Currency State
   const [currency, setCurrency] = useState<'INR' | 'USD'>('INR');
@@ -156,15 +313,20 @@ export default function App() {
   const [isOrderLookupOpen, setIsOrderLookupOpen] = useState(false);
 
   // Wishlist handler
-  const handleToggleWishlist = (prod: Product) => {
-    setWishlist((prev) => {
-      const exists = prev.some((p) => p.id === prod.id);
-      if (exists) {
-        return prev.filter((p) => p.id !== prod.id);
-      } else {
-        return [...prev, prod];
-      }
-    });
+  const handleToggleWishlist = async (prod: Product) => {
+    if (!currentUser) return;
+
+    const exists = wishlist.some((p) => p.id === prod.id);
+    const result = exists
+      ? await supabase.from('wishlist').delete().eq('user_id', currentUser.id).eq('product_id', prod.id)
+      : await supabase.from('wishlist').insert({ user_id: currentUser.id, product_id: prod.id });
+
+    if (result.error) {
+      console.error('Failed to update wishlist:', result.error);
+      return;
+    }
+
+    setWishlist(exists ? wishlist.filter((p) => p.id !== prod.id) : [...wishlist, prod]);
   };
 
   // Add to Bag Handlers
@@ -242,7 +404,7 @@ export default function App() {
       const disc = Math.round(subtotal * 0.1);
       setDiscountAmount(disc);
       setCouponCode(code);
-      return { success: true, message: `✨ Coupon AURA10 applied! 10% discount (-₹${disc.toLocaleString('en-IN')})` };
+      return { success: true, message: `✨ Coupon BHUVI10 applied! 10% discount (-₹${disc.toLocaleString('en-IN')})` };
     } else if (code === 'FIRSTFASHION') {
       const disc = 1500;
       setDiscountAmount(disc);
@@ -258,102 +420,290 @@ export default function App() {
   };
 
   // Order Placement
-  const handleOrderPlaced = (order: Order) => {
-    setOrders((prev) => [order, ...prev]);
+  const handleOrderPlaced = async (order: Order): Promise<boolean> => {
+    const { data: savedOrder, error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        user_id: currentUser?.id ?? null,
+        order_number: order.orderNumber,
+        order_date: order.date,
+        customer: order.customer,
+        subtotal: order.subtotal,
+        discount: order.discount,
+        coupon_code: order.couponCode ?? null,
+        shipping_fee: order.shippingFee,
+        total_amount: order.totalAmount,
+        payment_method: order.paymentMethod,
+        payment_status: order.paymentStatus,
+        order_status: order.orderStatus,
+        tracking_number: order.trackingNumber ?? null,
+        courier_partner: order.courierPartner ?? null,
+        estimated_delivery: order.estimatedDelivery,
+        whatsapp_updates: order.whatsappUpdates,
+        notes: order.notes ?? null,
+        timeline: order.timeline,
+      })
+      .select()
+      .single();
+
+    if (orderError || !savedOrder) {
+      console.error('Failed to create order:', orderError);
+      return false;
+    }
+
+    const { error: itemsError } = await supabase.from('order_items').insert(
+      order.items.map((item) => ({
+        order_id: savedOrder.id,
+        product_id: item.productId,
+        product_snapshot: item.product,
+        selected_size: item.selectedSize,
+        selected_color: item.selectedColor ?? null,
+        quantity: item.quantity,
+        is_customized: item.isCustomized,
+        customization: item.customization ?? null,
+        customization_fee: item.customizationFee,
+        item_total: item.itemTotal,
+      }))
+    );
+
+    if (itemsError) {
+      console.error('Failed to create order items:', itemsError);
+      await supabase.from('orders').delete().eq('id', savedOrder.id);
+      return false;
+    }
+
+    await loadOrders();
+    await sendBusinessEmail(
+      'order_confirmation',
+      order.customer.email,
+      `Order confirmation ${order.orderNumber}`,
+      `Your BhuviSri Enterprises order ${order.orderNumber} has been received.`,
+    );
     setCart([]);
     setDiscountAmount(0);
     setCouponCode('');
+    return true;
   };
 
   // Bespoke submission
-  const handleSubmitBespoke = (request: BespokeRequest) => {
-    setBespokeRequests((prev) => [request, ...prev]);
+  const handleSubmitBespoke = async (request: BespokeRequest) => {
+    const { error } = await supabase.from('bespoke_requests').insert({
+      user_id: currentUser?.id ?? null,
+      request_number: request.requestNumber,
+      customer_name: request.customerName,
+      email: request.email,
+      phone: request.phone,
+      category: request.category,
+      fabric_preference: request.fabricPreference,
+      budget_range: request.budgetRange,
+      target_date: request.targetDate || null,
+      description: request.description,
+      reference_images: request.referenceImages,
+      measurements: request.measurements ?? {},
+      status: request.status,
+      notes: request.notes ?? null,
+    });
+
+    if (error) {
+      console.error('Failed to create bespoke request:', error);
+      return;
+    }
+
+    await loadBespokeRequests();
+    await sendBusinessEmail(
+      'bespoke_request_confirmation',
+      request.email,
+      `Bespoke request confirmation ${request.requestNumber}`,
+      `Your BhuviSri Enterprises bespoke request ${request.requestNumber} has been received.`,
+    );
   };
 
   // Product Add / Update / Delete (Brand Owner)
-  const handleAddProduct = (newProd: Product) => {
-    setProducts((prev) => [newProd, ...prev]);
+  const getSupabaseProductPayload = (product: Product) => ({
+    sku: product.sku,
+    name: product.name,
+    tagline: product.tagline,
+    subcategory: product.subcategory,
+    description: product.description,
+    price: product.price,
+    original_price: product.originalPrice ?? null,
+    category: product.category,
+    images: product.images,
+    image_url: product.images[0] || null,
+    fabric: product.fabric,
+    color: product.color,
+    color_hex: product.colorHex,
+    occasion: product.occasion,
+    craft_details: product.craftDetails,
+    care_instructions: product.careInstructions,
+    available_sizes: product.availableSizes,
+    in_stock: product.inStock,
+    stock_count: product.stockCount,
+    is_best_seller: product.isBestSeller ?? false,
+    is_new_arrival: product.isNewArrival ?? false,
+    is_customizable: product.isCustomizable,
+    rating: product.rating,
+    review_count: product.reviewCount,
+    customization_base_price: product.customizationBasePrice ?? null,
+    is_active: product.isActive ?? true,
+  });
+
+  const handleAddProduct = async (newProd: Product) => {
+    const payload = getSupabaseProductPayload(newProd);
+    const { data: existingProduct, error: lookupError } = await supabase
+      .from('products')
+      .select('id')
+      .eq('name', payload.name)
+      .eq('price', payload.price)
+      .eq('category', payload.category)
+      .eq('image_url', payload.image_url)
+      .maybeSingle();
+
+    if (lookupError) {
+      console.error('Failed to check for an existing product:', lookupError);
+      return;
+    }
+
+    if (!existingProduct) {
+      const { error } = await supabase.from('products').insert(payload);
+      if (error) {
+        console.error('Failed to create product:', error);
+        return;
+      }
+    }
+
+    await loadProducts();
   };
 
-  const handleUpdateProduct = (updatedProd: Product) => {
-    setProducts((prev) => prev.map((p) => (p.id === updatedProd.id ? updatedProd : p)));
+  const handleUpdateProduct = async (updatedProd: Product) => {
+    const { error } = await supabase
+      .from('products')
+      .update(getSupabaseProductPayload(updatedProd))
+      .eq('id', updatedProd.id);
+
+    if (error) {
+      console.error('Failed to update product:', error);
+      return;
+    }
+
+    await loadProducts();
   };
 
-  const handleDeleteProduct = (prodId: string) => {
-    setProducts((prev) => prev.filter((p) => p.id !== prodId));
+  const handleDeleteProduct = async (prodId: string) => {
+    const { error } = await supabase
+      .from('products')
+      .update({
+        is_active: false,
+        in_stock: false,
+        stock_count: 0,
+      })
+      .eq('id', prodId);
+
+    if (error) {
+      console.error('Failed to deactivate product:', error);
+      return;
+    }
+
+    await loadProducts();
   };
 
   // Order status update (Brand Owner)
   const handleUpdateOrderStatus = (orderId: string, newStatus: OrderStatus, trackingNumber?: string, courierPartner?: string) => {
-    setOrders((prev) =>
-      prev.map((o) => {
-        if (o.id === orderId) {
-          const updatedTimeline = o.timeline.map((step) => {
-            if (step.status === newStatus) {
-              return { ...step, completed: true, timestamp: 'Updated by Atelier' };
-            }
-            return step;
-          });
-          return {
-            ...o,
-            orderStatus: newStatus,
-            trackingNumber: trackingNumber || o.trackingNumber,
-            courierPartner: courierPartner || o.courierPartner,
-            timeline: updatedTimeline
-          };
-        }
-        return o;
-      })
-    );
+    const order = orders.find((item) => item.id === orderId);
+    if (!order) return;
+    const updatedTimeline = order.timeline.map((step) => step.status === newStatus
+      ? { ...step, completed: true, timestamp: 'Updated by Atelier' }
+      : step);
+    supabase.from('orders').update({
+      order_status: newStatus,
+      tracking_number: trackingNumber || order.trackingNumber || null,
+      courier_partner: courierPartner || order.courierPartner || null,
+      timeline: updatedTimeline,
+    }).eq('id', orderId).then(({ error }) => {
+      if (error) console.error('Failed to update order status:', error);
+      else {
+        loadOrders();
+        void sendBusinessEmail(
+          'order_status_update',
+          order.customer.email,
+          `Order update ${order.orderNumber}`,
+          `Your BhuviSri Enterprises order ${order.orderNumber} is now ${newStatus}.`,
+        );
+      }
+    });
   };
 
   const handleUpdateBespokeStatus = (requestId: string, newStatus: BespokeRequest['status']) => {
-    setBespokeRequests((prev) =>
-      prev.map((r) => (r.id === requestId ? { ...r, status: newStatus } : r))
-    );
+    supabase.from('bespoke_requests').update({ status: newStatus }).eq('id', requestId).then(({ error }) => {
+      if (error) console.error('Failed to update bespoke status:', error);
+      else loadBespokeRequests();
+    });
   };
 
   // Admin login
-  const handleAdminLogin = (pass: string) => {
-    if (pass === 'admin123' || pass === 'owner' || pass === 'admin') {
-      setIsAdminLoggedIn(true);
-      return true;
+  const handleAdminLogin = async (email: string, password: string): Promise<{ success: boolean; reason?: 'invalid_credentials' | 'not_authorized' | 'error' }> => {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) return { success: false, reason: 'invalid_credentials' };
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: trimmedEmail,
+      password,
+    });
+
+    if (error || !data.user) return { success: false, reason: 'invalid_credentials' };
+
+    const { data: admin, error: adminError } = await supabase
+      .from('admin_users')
+      .select('user_id')
+      .eq('user_id', data.user.id)
+      .maybeSingle();
+
+    if (adminError) {
+      console.error('Failed to verify admin authorization:', adminError);
+      return { success: false, reason: 'error' };
     }
-    return false;
+
+    if (!admin) return { success: false, reason: 'not_authorized' };
+
+    setIsAdminLoggedIn(true);
+    return { success: true };
   };
 
-  const handleAdminLogout = () => {
+  const handleAdminLogout = async () => {
+    await supabase.auth.signOut();
     setIsAdminLoggedIn(false);
   };
 
+  const handleUserLogout = async () => {
+    await supabase.auth.signOut();
+    setCurrentUser(null);
+    setWishlist([]);
+  };
+
   // Review submission
-  const handleAddReview = (productId: string, reviewData: any) => {
-    setProducts((prev) =>
-      prev.map((p) => {
-        if (p.id === productId) {
-          const newRev = {
-            id: `rev-${Date.now()}`,
-            ...reviewData,
-            date: 'Just now',
-            verified: true
-          };
-          const updatedReviews = [newRev, ...p.reviews];
-          const newRating =
-            updatedReviews.reduce((sum, r) => sum + r.rating, 0) / updatedReviews.length;
-          return {
-            ...p,
-            reviews: updatedReviews,
-            rating: Number(newRating.toFixed(1)),
-            reviewCount: updatedReviews.length
-          };
-        }
-        return p;
-      })
-    );
+  const handleAddReview = async (productId: string, reviewData: Omit<Review, 'id' | 'date' | 'verified'>) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { error } = await supabase.from('reviews').insert({
+      user_id: user.id,
+      product_id: productId,
+      author: reviewData.author,
+      rating: reviewData.rating,
+      comment: reviewData.comment,
+      location: reviewData.location ?? null,
+      verified: true,
+    });
+    if (error) {
+      console.error('Failed to create review:', error);
+      return;
+    }
+    await loadProducts();
   };
 
   // Filtering products
   const filteredProducts = products.filter((p) => {
+    // Deactivated products stay visible to admins in Supabase RLS, so hide them from the storefront view explicitly.
+    if (p.isActive === false) return false;
     // Category
     if (activeCategory !== 'all' && activeCategory !== 'custom_studio' && p.category !== activeCategory) {
       return false;
@@ -440,7 +790,7 @@ export default function App() {
           }}
           onOpenCustomStudio={() => setIsCustomStudioOpen(true)}
           onOpenWhatsApp={() => {
-            const link = generateWhatsAppLink('919876543210', 'Namaste Aura & Loom! ✨ I would like assistance with saree draping & custom sizing.');
+            const link = generateWhatsAppLink('919876543210', 'Namaste BhuviSri Enterprises! ✨ I would like assistance with saree draping & custom sizing.');
             window.open(link, '_blank');
           }}
         />
@@ -482,7 +832,11 @@ export default function App() {
             </div>
           )}
 
-          {filteredProducts.length === 0 ? (
+          {isProductsLoading ? (
+            <div className="text-center py-20 bg-[#EAE5DF] border border-[#DCD7D0]">
+              <p className="font-serif italic text-2xl text-[#2A2A2A]">Loading collection...</p>
+            </div>
+          ) : filteredProducts.length === 0 ? (
             <div className="text-center py-20 bg-[#EAE5DF] border border-[#DCD7D0] space-y-4">
               <p className="font-serif italic text-2xl text-[#2A2A2A]">No items found.</p>
               <p className="text-xs text-[#6B655E] max-w-sm mx-auto font-light">
@@ -531,10 +885,7 @@ export default function App() {
       />
 
       {/* Floating WhatsApp Concierge Widget */}
-      <WhatsAppWidget
-        onOpenCustomStudio={() => setIsCustomStudioOpen(true)}
-        onOpenOrderLookup={() => setIsOrderLookupOpen(true)}
-      />
+      <WhatsAppWidget />
 
       {/* Modals & Slide-Overs */}
 
@@ -613,7 +964,7 @@ export default function App() {
         onClose={() => setIsUserAccountOpen(false)}
         currentUser={currentUser}
         onLogin={(usr) => setCurrentUser(usr)}
-        onLogout={() => setCurrentUser(null)}
+        onLogout={handleUserLogout}
         orders={orders}
         wishlist={wishlist}
         bespokeRequests={bespokeRequests}

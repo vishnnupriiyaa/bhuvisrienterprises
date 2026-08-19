@@ -425,7 +425,7 @@ export const INITIAL_PRODUCTS: Product[] = [
   {
     id: 'acc-02',
     sku: 'AL-ACC-302',
-    name: 'Aura Signature Hand-Woven Pashmina Stole',
+    name: 'BhuviSri Signature Hand-Woven Pashmina Stole',
     tagline: '100% Cashmere Pashmina with delicate Kashmiri Sozni needlepoint border',
     category: 'accessories',
     subcategory: 'Stoles & Dupattas',
@@ -534,7 +534,7 @@ export const INITIAL_PRODUCTS: Product[] = [
         location: 'London / Mumbai',
         rating: 5,
         date: '20 May 2026',
-        comment: 'Designing my bespoke lehenga with Aura & Loom was the smoothest experience. Their master artisan called me on WhatsApp to finalize the embroidery patterns!',
+        comment: 'Designing my bespoke lehenga with BhuviSri Enterprises was the smoothest experience. Their master artisan called me on WhatsApp to finalize the embroidery patterns!',
         verified: true
       }
     ]

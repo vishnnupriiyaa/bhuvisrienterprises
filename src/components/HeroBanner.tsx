@@ -58,7 +58,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
           <div className="w-full h-full max-h-[380px] border border-[#DCD7D0] relative overflow-hidden group shadow-xs">
             <img
               src="https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1200&q=85"
-              alt="Aura & Loom Silk Drape"
+              alt="BhuviSri Enterprises Silk Drape"
               className="w-full h-full object-cover object-center transform group-hover:scale-105 transition-transform duration-700"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>

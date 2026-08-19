@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { supabase } from '../lib/supabase';
 import { 
   ShieldCheck, 
   Package, 
@@ -36,7 +37,7 @@ interface AdminPortalProps {
   onUpdateOrderStatus: (orderId: string, newStatus: OrderStatus, trackingNumber?: string, courierPartner?: string) => void;
   onUpdateBespokeStatus: (requestId: string, newStatus: BespokeRequest['status']) => void;
   isAdminLoggedIn: boolean;
-  onAdminLogin: (pass: string) => boolean;
+  onAdminLogin: (email: string, pass: string) => Promise<{ success: boolean; reason?: 'invalid_credentials' | 'not_authorized' | 'error' }>;
   onAdminLogout: () => void;
 }
 
@@ -58,8 +59,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   if (!isOpen) return null;
 
   // Login form state
+  const [loginEmail, setLoginEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loginError, setLoginError] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   // Active Admin Tab
   const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'orders' | 'bespoke' | 'settings'>('overview');
@@ -91,8 +93,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [colorHex, setColorHex] = useState('#D4AF37');
   const [occasion, setOccasion] = useState('Weddings & Festive');
   const [description, setDescription] = useState('');
+  const [craftDetailsInput, setCraftDetailsInput] = useState('Pure certified artisanal handloom weave\nCustom made-to-measure tailoring available');
+  const [careInstructions, setCareInstructions] = useState('Dry clean only. Store in muslin cloth.');
   const [availableSizes, setAvailableSizes] = useState('Free Size (6.2m with blouse)');
   const [stockCount, setStockCount] = useState(10);
+  const [inStock, setInStock] = useState(true);
+  const [isBestSeller, setIsBestSeller] = useState(false);
+  const [isNewArrival, setIsNewArrival] = useState(false);
   const [isCustomizable, setIsCustomizable] = useState(true);
 
   // Order Search & Filter
@@ -101,53 +108,67 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   // Settings State
   const [whatsappHelpline, setWhatsappHelpline] = useState('+91 98765 43210');
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const success = onAdminLogin(password);
-    if (!success) {
-      setLoginError(true);
+    const result = await onAdminLogin(loginEmail.trim(), password);
+    if (!result.success) {
+      setLoginError(
+        result.reason === 'not_authorized'
+          ? 'Your account is not authorized as an administrator.'
+          : result.reason === 'error'
+          ? 'Could not verify admin access. Please try again.'
+          : 'Incorrect email or password.'
+      );
     } else {
-      setLoginError(false);
+      setLoginError(null);
     }
   };
 
-  // Multiple File Processing
-  const processFiles = (files: FileList | File[]) => {
+  // Multiple File Processing using real Supabase Storage bucket.
+  const processFiles = async (files: FileList | File[]) => {
     const validImageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
-    if (validImageFiles.length === 0) return;
+    if (validImageFiles.length === 0) {
+      setUploadStatusMsg('Please select valid image files (JPEG, PNG, WEBP, GIF).');
+      setTimeout(() => setUploadStatusMsg(null), 3500);
+      return;
+    }
 
-    setUploadStatusMsg(`Processing ${validImageFiles.length} photo(s)...`);
+    setUploadStatusMsg(`Uploading ${validImageFiles.length} photo(s) to Supabase Storage...`);
 
-    const readPromises = validImageFiles.map(file => {
-      return new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          if (typeof reader.result === 'string') {
-            resolve(reader.result);
-          } else {
-            reject(new Error('Failed to read file'));
-          }
-        };
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
-      });
-    });
+    try {
+      const uploadedUrls: string[] = [];
 
-    Promise.all(readPromises)
-      .then(newImages => {
-        setImageGallery(prev => [...prev, ...newImages]);
-        setUploadStatusMsg(`Successfully added ${newImages.length} image(s).`);
-        setTimeout(() => setUploadStatusMsg(null), 3000);
-      })
-      .catch(() => {
-        setUploadStatusMsg('Error reading some images. Please retry.');
-        setTimeout(() => setUploadStatusMsg(null), 4000);
-      });
+      for (const file of validImageFiles) {
+        const safeName = `${Date.now()}-${Math.random().toString(16).slice(2)}-${file.name.replace(/\s+/g, '-').toLowerCase()}`;
+        const { data, error } = await supabase.storage
+          .from('product-images')
+          .upload(safeName, file, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: file.type,
+          });
+
+        if (error) {
+          throw error;
+        }
+
+        const publicUrl = supabase.storage.from('product-images').getPublicUrl(data.path).data.publicUrl;
+        uploadedUrls.push(publicUrl);
+      }
+
+      setImageGallery(prev => [...prev, ...uploadedUrls]);
+      setUploadStatusMsg(`Successfully uploaded ${uploadedUrls.length} image(s).`);
+      setTimeout(() => setUploadStatusMsg(null), 3500);
+    } catch (error) {
+      console.error('Image upload failed:', error);
+      setUploadStatusMsg('Image upload failed. Check Supabase Storage permissions and bucket configuration.');
+      setTimeout(() => setUploadStatusMsg(null), 4500);
+    }
   };
 
-  const handleImageFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      processFiles(e.target.files);
+      await processFiles(e.target.files);
       e.target.value = ''; // Reset input to allow re-selecting same files
     }
   };
@@ -177,20 +198,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   // Bulk URL Adder (handles single URL or comma/newline separated URLs)
   const handleAddImageUrls = () => {
     if (!imageUrlInput.trim()) return;
-    
-    // Split by newlines, commas, or spaces
+
     const urls = imageUrlInput
       .split(/[\n,]+/)
       .map(u => u.trim())
-      .filter(u => u.length > 0 && (u.startsWith('http://') || u.startsWith('https://') || u.startsWith('data:image')));
+      .filter(u => u.length > 0 && (u.startsWith('http://') || u.startsWith('https://')));
 
     if (urls.length > 0) {
+      setUploadStatusMsg('External URLs are accepted for preview, but product images should be uploaded to Supabase Storage for production use.');
       setImageGallery(prev => [...prev, ...urls]);
       setImageUrlInput('');
-      setUploadStatusMsg(`Added ${urls.length} image URL(s).`);
-      setTimeout(() => setUploadStatusMsg(null), 3000);
+      setTimeout(() => setUploadStatusMsg(null), 4500);
     } else {
-      setUploadStatusMsg('Please enter valid image URL(s) starting with http:// or https://');
+      setUploadStatusMsg('Please enter valid image URLs starting with http:// or https://');
       setTimeout(() => setUploadStatusMsg(null), 4000);
     }
   };
@@ -229,35 +249,86 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   const handleSaveProduct = (e: React.FormEvent) => {
     e.preventDefault();
+
+    const trimmedName = name.trim();
+    const trimmedCategory = category.trim();
+    const parsedPrice = Number(price);
+    const parsedOriginalPrice = Number(originalPrice || 0);
+    const parsedStockCount = Number(stockCount);
+    const normalizedSizes = availableSizes
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const craftDetails = craftDetailsInput
+      .split(/\n|,/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (!trimmedName) {
+      setUploadStatusMsg('Please enter a product name.');
+      setTimeout(() => setUploadStatusMsg(null), 3000);
+      return;
+    }
+
+    if (!trimmedCategory) {
+      setUploadStatusMsg('Please select a product category.');
+      setTimeout(() => setUploadStatusMsg(null), 3000);
+      return;
+    }
+
+    if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+      setUploadStatusMsg('Price must be greater than zero.');
+      setTimeout(() => setUploadStatusMsg(null), 3000);
+      return;
+    }
+
+    if (parsedOriginalPrice > 0 && parsedOriginalPrice < parsedPrice) {
+      setUploadStatusMsg('Original price should be greater than or equal to the sale price.');
+      setTimeout(() => setUploadStatusMsg(null), 3000);
+      return;
+    }
+
+    if (!Number.isFinite(parsedStockCount) || parsedStockCount < 0) {
+      setUploadStatusMsg('Inventory must be a valid non-negative number.');
+      setTimeout(() => setUploadStatusMsg(null), 3000);
+      return;
+    }
+
+    if (imageGallery.length === 0) {
+      setUploadStatusMsg('Please upload at least one product image before saving.');
+      setTimeout(() => setUploadStatusMsg(null), 3000);
+      return;
+    }
+
     const sku = editingProduct ? editingProduct.sku : `AL-${category.substring(0, 3).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
     const productPayload: Product = {
       id: editingProduct ? editingProduct.id : `prod-${Date.now()}`,
       sku,
-      name,
-      tagline,
+      name: trimmedName,
+      tagline: tagline.trim(),
       category,
-      subcategory,
-      price: Number(price),
-      originalPrice: originalPrice ? Number(originalPrice) : undefined,
-      images: imageGallery.length > 0 ? imageGallery : ['https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1000&q=85'],
-      fabric,
-      color,
-      colorHex,
-      occasion,
-      description: description || 'Exquisite handcrafted apparel tailored for the discerning connoisseur.',
-      craftDetails: [
-        'Pure certified artisanal handloom weave',
-        'Custom made-to-measure tailoring available'
-      ],
-      careInstructions: 'Dry clean only. Store in muslin cloth.',
-      availableSizes: availableSizes.split(',').map((s) => s.trim()),
-      inStock: stockCount > 0,
-      stockCount: Number(stockCount),
+      subcategory: subcategory.trim(),
+      price: parsedPrice,
+      originalPrice: parsedOriginalPrice > 0 ? parsedOriginalPrice : undefined,
+      images: imageGallery,
+      fabric: fabric.trim(),
+      color: color.trim(),
+      colorHex: colorHex.trim() || '#000000',
+      occasion: occasion.trim(),
+      description: description.trim() || 'Exquisite handcrafted apparel tailored for the discerning connoisseur.',
+      craftDetails: craftDetails.length ? craftDetails : ['Artisanal handloom craftsmanship'],
+      careInstructions: careInstructions.trim() || 'Dry clean only. Store in muslin cloth.',
+      availableSizes: normalizedSizes.length ? normalizedSizes : ['Free Size'],
+      inStock: inStock && parsedStockCount > 0,
+      stockCount: parsedStockCount,
+      isBestSeller,
+      isNewArrival,
       isCustomizable,
       customizationBasePrice: isCustomizable ? 1500 : 0,
       rating: editingProduct ? editingProduct.rating : 5.0,
       reviewCount: editingProduct ? editingProduct.reviewCount : 1,
-      reviews: editingProduct ? editingProduct.reviews : []
+      reviews: editingProduct ? editingProduct.reviews : [],
+      isActive: true,
     };
 
     if (editingProduct) {
@@ -285,9 +356,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setColorHex(prod.colorHex);
     setOccasion(prod.occasion);
     setDescription(prod.description);
+    setCraftDetailsInput((prod.craftDetails ?? []).join('\n'));
+    setCareInstructions(prod.careInstructions || 'Dry clean only. Store in muslin cloth.');
     setAvailableSizes(prod.availableSizes.join(', '));
     setStockCount(prod.stockCount);
-    setIsCustomizable(prod.isCustomizable);
+    setInStock(prod.inStock);
+    setIsBestSeller(Boolean(prod.isBestSeller));
+    setIsNewArrival(Boolean(prod.isNewArrival));
+    setIsCustomizable(Boolean(prod.isCustomizable));
     setShowAddProductModal(true);
   };
 
@@ -308,8 +384,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setColorHex('#D4AF37');
     setOccasion('Weddings & Festive');
     setDescription('');
+    setCraftDetailsInput('Pure certified artisanal handloom weave\nCustom made-to-measure tailoring available');
+    setCareInstructions('Dry clean only. Store in muslin cloth.');
     setAvailableSizes('Free Size (6.2m with blouse)');
     setStockCount(10);
+    setInStock(true);
+    setIsBestSeller(false);
+    setIsNewArrival(false);
     setIsCustomizable(true);
     setShowAddProductModal(true);
   };
@@ -386,22 +467,34 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
               <form onSubmit={handleLoginSubmit} className="space-y-4 text-left text-xs">
                 <div>
-                  <label className="block text-[10px] uppercase tracking-wider text-[#6B655E] mb-1 font-bold">Passcode</label>
+                  <label className="block text-[10px] uppercase tracking-wider text-[#6B655E] mb-1 font-bold">Admin Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    placeholder="admin@yourbrand.com"
+                    className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 text-xs text-[#2A2A2A] focus:outline-none focus:border-[#2A2A2A]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wider text-[#6B655E] mb-1 font-bold">Password</label>
                   <input
                     type="password"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="demo: admin123"
+                    placeholder="Enter your Supabase Auth password"
                     className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 text-xs text-[#2A2A2A] focus:outline-none focus:border-[#2A2A2A]"
                   />
                   <span className="text-[10px] text-[#6B655E] mt-1 block">
-                    Demo passcode: <strong className="text-[#2A2A2A]">admin123</strong>
+                    Use the password for the authorized admin account in Supabase Auth.
                   </span>
                 </div>
 
                 {loginError && (
-                  <p className="text-xs text-[#2A2A2A] font-bold">Incorrect passcode. Try 'admin123'.</p>
+                  <p className="text-xs text-[#2A2A2A] font-bold">{loginError}</p>
                 )}
 
                 <button
@@ -834,7 +927,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
                             <button
                               onClick={() => {
-                                const msg = `Hello ${req.customerName}! 🌸\nThis is the Master Designer from Aura & Loom regarding your Bespoke Custom Request (#${req.requestNumber} - ${req.category}).\nWe have reviewed your references and would love to schedule a video drape call.`;
+                                const msg = `Hello ${req.customerName}! 🌸\nThis is the Master Designer from BhuviSri Enterprises regarding your Bespoke Custom Request (#${req.requestNumber} - ${req.category}).\nWe have reviewed your references and would love to schedule a video drape call.`;
                                 const link = generateWhatsAppLink(req.phone, msg);
                                 window.open(link, '_blank');
                               }}
@@ -937,23 +1030,21 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   />
                 </div>
 
-                {/* Category & Subcategory */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] uppercase tracking-wider font-bold text-[#6B655E] mb-1">Category *</label>
+                    <label className="block text-[10px] uppercase tracking-wider font-bold text-[#6B655E] mb-1">Category</label>
                     <select
                       value={category}
                       onChange={(e) => setCategory(e.target.value as ProductCategory)}
-                      className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2 text-xs"
+                      className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2 text-xs text-[#2A2A2A]"
                     >
                       <option value="sarees">Sarees</option>
-                      <option value="ethnic">Ethnic Wear</option>
-                      <option value="western">Western Wear</option>
+                      <option value="ethnic">Ethnic</option>
+                      <option value="western">Western</option>
                       <option value="accessories">Accessories</option>
-                      <option value="custom">Custom Studio</option>
+                      <option value="custom">Custom</option>
                     </select>
                   </div>
-
                   <div>
                     <label className="block text-[10px] uppercase tracking-wider font-bold text-[#6B655E] mb-1">Subcategory</label>
                     <input
@@ -964,6 +1055,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2 text-xs"
                     />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer text-[10px] uppercase tracking-wider font-bold text-[#2A2A2A]">
+                    <input type="checkbox" checked={isBestSeller} onChange={(e) => setIsBestSeller(e.target.checked)} />
+                    Best Seller
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-[10px] uppercase tracking-wider font-bold text-[#2A2A2A]">
+                    <input type="checkbox" checked={isNewArrival} onChange={(e) => setIsNewArrival(e.target.checked)} />
+                    New Arrival
+                  </label>
                 </div>
 
                 {/* Pricing & Stock */}
@@ -1190,6 +1292,33 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   </div>
                 </div>
 
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider font-bold text-[#6B655E] mb-1">Color Hex</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={colorHex}
+                        onChange={(e) => setColorHex(e.target.value)}
+                        className="w-12 h-10 bg-transparent border border-[#DCD7D0] p-0.5"
+                      />
+                      <input
+                        type="text"
+                        value={colorHex}
+                        onChange={(e) => setColorHex(e.target.value)}
+                        className="flex-1 bg-[#F5F2ED] border border-[#DCD7D0] p-2 text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider font-bold text-[#6B655E] mb-1">In Stock</label>
+                    <label className="flex items-center gap-2 h-10 px-3 border border-[#DCD7D0] bg-[#F5F2ED] text-xs">
+                      <input type="checkbox" checked={inStock} onChange={(e) => setInStock(e.target.checked)} />
+                      <span>{inStock ? 'Available' : 'Out of stock'}</span>
+                    </label>
+                  </div>
+                </div>
+
                 {/* Available Sizes & Occasion */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -1222,6 +1351,28 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Artisanal details, drape feel, blouse piece inclusion..."
+                    className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 text-xs text-[#2A2A2A]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wider font-bold text-[#6B655E] mb-1">Craft Details (one per line)</label>
+                  <textarea
+                    rows={3}
+                    value={craftDetailsInput}
+                    onChange={(e) => setCraftDetailsInput(e.target.value)}
+                    placeholder="Handloom weave&#10;Antique zari border&#10;Made in small batches"
+                    className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 text-xs text-[#2A2A2A]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] uppercase tracking-wider font-bold text-[#6B655E] mb-1">Care Instructions</label>
+                  <textarea
+                    rows={2}
+                    value={careInstructions}
+                    onChange={(e) => setCareInstructions(e.target.value)}
+                    placeholder="Dry clean only. Store in muslin cloth."
                     className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 text-xs text-[#2A2A2A]"
                   />
                 </div>

@@ -24,7 +24,7 @@ export const Footer: React.FC<FooterProps> = ({
   };
 
   const handleDirectWhatsApp = () => {
-    const link = generateWhatsAppLink('919876543210', 'Namaste Aura & Loom! ✨ I would like styling assistance.');
+    const link = generateWhatsAppLink('919876543210', 'Namaste BhuviSri Enterprises! ✨ I would like styling assistance.');
     window.open(link, '_blank');
   };
 
@@ -36,7 +36,7 @@ export const Footer: React.FC<FooterProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pb-10 border-b border-[#3E3E3E] items-center">
           <div className="lg:col-span-6 space-y-2">
             <span className="font-serif italic text-2xl sm:text-3xl tracking-[0.1em] uppercase font-normal block">
-              Aura & Loom
+              BhuviSri Enterprises
             </span>
             <p className="text-xs text-[#A89F91] max-w-md font-light leading-relaxed">
               Curated heritage handloom sarees, bespoke festive couture, and modern silhouettes with precision made-to-measure tailoring.
@@ -80,7 +80,7 @@ export const Footer: React.FC<FooterProps> = ({
         </div>
 
         {/* Links Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-xs text-[#A89F91]">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-8 text-xs text-[#A89F91]">
           {/* Col 1: Collections */}
           <div className="space-y-3">
             <h3 className="text-white text-[11px] uppercase tracking-[0.2em] font-bold">
@@ -95,20 +95,20 @@ export const Footer: React.FC<FooterProps> = ({
             </ul>
           </div>
 
-          {/* Col 2: Atelier Services */}
+          {/* Col 2: Contact */}
           <div className="space-y-3">
             <h3 className="text-white text-[11px] uppercase tracking-[0.2em] font-bold">
-              Services
+              Contact
             </h3>
             <ul className="space-y-2 text-[11px]">
               <li>
-                <button onClick={onOpenCustomStudio} className="hover:text-white transition-colors text-left cursor-pointer">
-                  Bespoke Tailoring Atelier
-                </button>
+                <a href="mailto:bhuvisri.enterprises@gmail.com" className="hover:text-white transition-colors">
+                  bhuvisri.enterprises@gmail.com
+                </a>
               </li>
               <li>
-                <button onClick={handleDirectWhatsApp} className="hover:text-white transition-colors text-left cursor-pointer">
-                  WhatsApp Video Drape
+                <button onClick={onOpenCustomStudio} className="hover:text-white transition-colors text-left cursor-pointer">
+                  Bespoke Tailoring Atelier
                 </button>
               </li>
               <li>
@@ -116,24 +116,10 @@ export const Footer: React.FC<FooterProps> = ({
                   Order Status & Tracking
                 </button>
               </li>
-              <li><span className="hover:text-white transition-colors cursor-pointer">Silk Mark Certification</span></li>
             </ul>
           </div>
 
-          {/* Col 3: Client Concierge */}
-          <div className="space-y-3">
-            <h3 className="text-white text-[11px] uppercase tracking-[0.2em] font-bold">
-              Client Care
-            </h3>
-            <ul className="space-y-2 text-[11px]">
-              <li><span className="hover:text-white transition-colors cursor-pointer">Worldwide Insured Transit</span></li>
-              <li><span className="hover:text-white transition-colors cursor-pointer">Complimentary Fall & Pico</span></li>
-              <li><span className="hover:text-white transition-colors cursor-pointer">PCI-DSS 256-Bit Security</span></li>
-              <li><span className="hover:text-white transition-colors cursor-pointer">Fabric & Zari Preservation</span></li>
-            </ul>
-          </div>
-
-          {/* Col 4: WhatsApp Hotline */}
+          {/* Col 3: WhatsApp Hotline */}
           <div className="space-y-3">
             <h3 className="text-white text-[11px] uppercase tracking-[0.2em] font-bold">
               Artisan Helpline
@@ -169,7 +155,7 @@ export const Footer: React.FC<FooterProps> = ({
               <span>Staff Login</span>
             </button>
             <span className="border-l border-[#444] pl-4">
-              Aura & Loom &copy; 2026
+              BhuviSri Enterprises &copy; 2026
             </span>
           </div>
         </div>

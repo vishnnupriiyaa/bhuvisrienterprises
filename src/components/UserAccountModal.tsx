@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { UserProfile, Order, Product, BespokeRequest } from '../types';
 import { formatCurrency, generateWhatsAppLink, getOrderWhatsAppText } from '../utils/formatters';
+import { supabase } from '../lib/supabase';
 
 interface UserAccountModalProps {
   isOpen: boolean;
@@ -47,26 +48,34 @@ export const UserAccountModal: React.FC<UserAccountModalProps> = ({
   const [loginEmail, setLoginEmail] = useState('priya@example.com');
   const [loginName, setLoginName] = useState('Priya Sharma');
   const [loginPhone, setLoginPhone] = useState('+91 98765 43210');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
 
-  const handleDemoLogin = () => {
-    onLogin({
-      id: 'usr-priya',
-      name: 'Priya Sharma',
-      email: 'priya@example.com',
-      phone: '+91 98765 43210',
-      role: 'customer',
-    });
-  };
-
-  const handleCustomAuth = (e: React.FormEvent) => {
+  const handleCustomAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin({
-      id: `usr-${Date.now()}`,
-      name: loginName || 'Valued Client',
-      email: loginEmail,
-      phone: loginPhone,
-      role: 'customer',
-    });
+    setAuthError(null);
+    const result = isRegisterMode
+      ? await supabase.auth.signUp({
+        email: loginEmail,
+        password: loginPassword,
+        options: { data: { full_name: loginName, phone: loginPhone } },
+      })
+      : await supabase.auth.signInWithPassword({ email: loginEmail, password: loginPassword });
+
+    if (result.error) {
+      setAuthError(result.error.message);
+      return;
+    }
+
+    if (result.data.user) {
+      onLogin({
+        id: result.data.user.id,
+        name: loginName || result.data.user.email?.split('@')[0] || 'Valued Client',
+        email: result.data.user.email || loginEmail,
+        phone: loginPhone,
+        role: 'customer',
+      });
+    }
   };
 
   return (
@@ -124,21 +133,6 @@ export const UserAccountModal: React.FC<UserAccountModalProps> = ({
               </p>
             </div>
 
-            {/* Demo Login */}
-            <button
-              onClick={handleDemoLogin}
-              className="w-full py-3 px-4 bg-[#EAE5DF] hover:bg-[#DCD7D0] border border-[#DCD7D0] text-xs font-bold uppercase tracking-wider text-[#2A2A2A] flex items-center justify-center gap-2 transition-all cursor-pointer"
-            >
-              <ShieldCheck size={15} />
-              <span>One-Click Sign In as <strong>Priya Sharma</strong> (Demo)</span>
-            </button>
-
-            <div className="flex items-center gap-3 text-xs text-[#6B655E]">
-              <div className="flex-1 h-px bg-[#DCD7D0]"></div>
-              <span className="text-[10px] uppercase tracking-wider">OR</span>
-              <div className="flex-1 h-px bg-[#DCD7D0]"></div>
-            </div>
-
             <form onSubmit={handleCustomAuth} className="space-y-3.5 text-xs">
               {isRegisterMode && (
                 <div>
@@ -174,6 +168,20 @@ export const UserAccountModal: React.FC<UserAccountModalProps> = ({
                 />
               </div>
 
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-[#6B655E] mb-1 font-bold">Password *</label>
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 text-xs text-[#2A2A2A]"
+                />
+              </div>
+
+              {authError && <p className="text-xs text-[#2A2A2A] font-bold">{authError}</p>}
+
               <button
                 type="submit"
                 className="w-full py-3 bg-[#2A2A2A] hover:bg-[#404040] text-white text-[10px] font-bold uppercase tracking-[0.2em] cursor-pointer"
@@ -187,7 +195,7 @@ export const UserAccountModal: React.FC<UserAccountModalProps> = ({
                 onClick={() => setIsRegisterMode(!isRegisterMode)}
                 className="text-[10px] uppercase tracking-wider text-[#A68A64] hover:underline font-bold cursor-pointer"
               >
-                {isRegisterMode ? 'Already have an account? Sign In' : 'New to Aura & Loom? Register here'}
+                {isRegisterMode ? 'Already have an account? Sign In' : 'New to BhuviSri Enterprises? Register here'}
               </button>
             </div>
           </div>

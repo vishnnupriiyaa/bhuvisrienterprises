@@ -69,9 +69,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2">
           <div className="flex items-center gap-2 tracking-[0.15em] uppercase text-[10px]">
             <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#A68A64] animate-pulse"></span>
-            <span>Bespoke Blouse Tailoring Included Above ₹15,000</span>
-            <span className="hidden md:inline text-[#8C857D]">|</span>
-            <span className="hidden md:inline text-[#DCD7D0]">Worldwide Express Insured Shipping</span>
+            <span>Express Shipping</span>
           </div>
 
           <div className="flex items-center gap-5 text-[10px] uppercase tracking-[0.2em]">
@@ -163,7 +161,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="inline-flex flex-col items-center group cursor-pointer"
             >
               <span className="font-serif text-2xl sm:text-3xl tracking-[0.12em] uppercase italic text-[#2A2A2A] group-hover:opacity-80 transition-opacity">
-                Aura & Loom
+                BhuviSri Enterprises
               </span>
               <span className="text-[9px] uppercase tracking-[0.4em] text-[#A68A64] font-medium -mt-1">
                 Heritage Couture

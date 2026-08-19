@@ -22,7 +22,7 @@ interface CheckoutModalProps {
   currency: 'INR' | 'USD';
   discount: number;
   couponCode?: string;
-  onOrderPlaced: (order: Order) => void;
+  onOrderPlaced: (order: Order) => Promise<boolean>;
   initialCustomer?: Partial<CustomerDetails>;
 }
 
@@ -103,8 +103,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }, 1000);
   };
 
-  const finalizeOrder = (paymentStatus: 'Paid' | 'Pending') => {
-    const orderNum = `AL-${Math.floor(8000 + Math.random() * 1999)}`;
+  const finalizeOrder = async (paymentStatus: 'Paid' | 'Pending') => {
+    const orderNum = `AL-${Date.now()}`;
     const now = new Date();
     const estDate = new Date();
     estDate.setDate(now.getDate() + 5);
@@ -161,8 +161,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       ]
     };
 
+    const wasSaved = await onOrderPlaced(newOrder);
+    if (!wasSaved) {
+      setIsProcessing(false);
+      return;
+    }
+
     setCompletedOrder(newOrder);
-    onOrderPlaced(newOrder);
     setStep('success');
 
     try {

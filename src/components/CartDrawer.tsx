@@ -69,7 +69,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       )
       .join('\n');
 
-    const msg = `Hello Aura & Loom Atelier! ✨\nI would like to place an order for the following items in my bag:\n\n${itemsList}\n\n*Subtotal:* ₹${subtotal.toLocaleString('en-IN')}\n*Estimated Total:* ₹${total.toLocaleString('en-IN')}\n\nPlease guide me through payment confirmation and tailoring notes.`;
+    const msg = `Hello BhuviSri Enterprises Atelier! ✨\nI would like to place an order for the following items in my bag:\n\n${itemsList}\n\n*Subtotal:* ₹${subtotal.toLocaleString('en-IN')}\n*Estimated Total:* ₹${total.toLocaleString('en-IN')}\n\nPlease guide me through payment confirmation and tailoring notes.`;
     const link = generateWhatsAppLink('919876543210', msg);
     window.open(link, '_blank');
   };

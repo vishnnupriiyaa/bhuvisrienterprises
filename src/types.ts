@@ -57,6 +57,7 @@ export interface Product {
   reviewCount: number;
   reviews: Review[];
   customizationBasePrice?: number;
+  isActive?: boolean;
 }
 
 export interface CartItem {

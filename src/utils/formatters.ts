@@ -13,13 +13,13 @@ export const generateWhatsAppLink = (phone: string = '919876543210', message: st
 };
 
 export const getProductWhatsAppText = (productName: string, sku: string, price: number, url?: string): string => {
-  return `Hello Aura & Loom Atelier! ✨\nI am interested in *${productName}* (SKU: ${sku}, Price: ₹${price.toLocaleString('en-IN')}).\nCan you please share more details, fabric video drape or size consultation?`;
+  return `Hello BhuviSri Enterprises Atelier! ✨\nI am interested in *${productName}* (SKU: ${sku}, Price: ₹${price.toLocaleString('en-IN')}).\nCan you please share more details, fabric video drape or size consultation?`;
 };
 
 export const getOrderWhatsAppText = (orderNumber: string, customerName: string, status: string): string => {
-  return `Namaste ${customerName}! 🌸\nYour Aura & Loom Order *#${orderNumber}* status update: *${status}*.\nWe are carefully crafting and packing your bespoke pieces. Tap here to chat with our stylist.`;
+  return `Namaste ${customerName}! 🌸\nYour BhuviSri Enterprises Order *#${orderNumber}* status update: *${status}*.\nWe are carefully crafting and packing your bespoke pieces. Tap here to chat with our stylist.`;
 };
 
 export const getCustomConsultationWhatsAppText = (customerName: string, category: string, reqNum?: string): string => {
-  return `Hello Aura & Loom Atelier! ✨\nMy name is *${customerName}*. I would like to schedule a bespoke consultation for: *${category}*${reqNum ? ` (Ref #${reqNum})` : ''}.\nPlease let me know available slots for a video call or styling discussion.`;
+  return `Hello BhuviSri Enterprises Atelier! ✨\nMy name is *${customerName}*. I would like to schedule a bespoke consultation for: *${category}*${reqNum ? ` (Ref #${reqNum})` : ''}.\nPlease let me know available slots for a video call or styling discussion.`;
 };

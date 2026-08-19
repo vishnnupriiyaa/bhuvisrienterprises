@@ -237,7 +237,7 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({
               <div className="bg-[#EAE5DF] p-4 border border-[#DCD7D0] space-y-1.5">
                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#2A2A2A]">
                   <ShieldCheck size={14} className="text-[#A68A64]" />
-                  <span>Aura & Loom Authenticity</span>
+                  <span>BhuviSri Enterprises Authenticity</span>
                 </div>
                 <p className="text-xs text-[#6B655E] font-light leading-relaxed">
                   Silk Mark certified & hand-inspected for zari purity. Shipped in signature archival linen box.
