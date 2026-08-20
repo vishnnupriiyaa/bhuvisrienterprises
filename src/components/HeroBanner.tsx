@@ -57,7 +57,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
         <div className="w-full lg:w-1/2 bg-[#EAE5DF] p-8 sm:p-12 flex items-center justify-center relative min-h-[360px] lg:min-h-[440px]">
           <div className="w-full h-full max-h-[380px] border border-[#DCD7D0] relative overflow-hidden group shadow-xs">
             <img
-              src="https://drive.google.com/uc?export=view&id=1xU4vPswmE7lufOU0rx1hgwwgMRkCtURF"
+              src="/images/hero-large.jpg"
               alt="BhuviSri Enterprises Silk Drape"
               className="w-full h-full object-cover object-center transform group-hover:scale-105 transition-transform duration-700"
             />
@@ -93,7 +93,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
             </div>
             <div className="w-full aspect-3/4 bg-[#F0EDE9] mb-4 overflow-hidden border border-[#DCD7D0]">
               <img 
-                src="https://drive.usercontent.google.com/download?id=1LbRicR37mDR0RcybFFEeekXl-1bHUQ4t&export=view&authuser=0" 
+                src="/images/sarees-card.jpg" 
                 alt="Sarees" 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
@@ -116,7 +116,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
             </div>
             <div className="w-full aspect-3/4 bg-[#F0EDE9] mb-4 overflow-hidden border border-[#DCD7D0]">
               <img 
-                src="https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?auto=format&fit=crop&w=600&q=80" 
+                src="/images/category-ethnic.jpg" 
                 alt="Ethnic" 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
@@ -139,7 +139,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
             </div>
             <div className="w-full aspect-3/4 bg-[#F0EDE9] mb-4 overflow-hidden border border-[#DCD7D0]">
               <img 
-                src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=600&q=80" 
+                src="/images/category-western.jpg" 
                 alt="Western" 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
@@ -162,7 +162,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
             </div>
             <div className="w-full aspect-3/4 bg-[#F0EDE9] mb-4 overflow-hidden border border-[#DCD7D0]">
               <img 
-                src="https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=600&q=80" 
+                src="/images/category-accessories.jpg" 
                 alt="Accessories" 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
