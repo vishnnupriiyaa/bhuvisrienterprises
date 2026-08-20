@@ -57,7 +57,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
         <div className="w-full lg:w-1/2 bg-[#EAE5DF] p-8 sm:p-12 flex items-center justify-center relative min-h-[360px] lg:min-h-[440px]">
           <div className="w-full h-full max-h-[380px] border border-[#DCD7D0] relative overflow-hidden group shadow-xs">
             <img
-              src="https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1200&q=85"
+              src="https://drive.google.com/uc?export=view&id=1xU4vPswmE7lufOU0rx1hgwwgMRkCtURF"
               alt="BhuviSri Enterprises Silk Drape"
               className="w-full h-full object-cover object-center transform group-hover:scale-105 transition-transform duration-700"
             />
@@ -67,13 +67,13 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
               <span className="text-[9px] uppercase tracking-[0.3em] font-medium text-[#DCD7D0] block mb-1">
                 Pure Handloom Mulberry Silk
               </span>
-              <p className="font-serif italic text-2xl">Vermillion Kanjeevaram Drape</p>
+              <p className="font-serif italic text-2xl"></p>
             </div>
           </div>
 
           {/* Floating Luxury Tag */}
           <div className="absolute bottom-6 right-6 sm:bottom-8 sm:right-8 bg-white/90 backdrop-blur-sm px-4 py-3 border border-[#DCD7D0] text-[10px] tracking-[0.25em] uppercase font-bold text-[#2A2A2A] shadow-xs">
-            Luxury Couture 2026
+            collection 2026
           </div>
         </div>
 
@@ -93,7 +93,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
             </div>
             <div className="w-full aspect-3/4 bg-[#F0EDE9] mb-4 overflow-hidden border border-[#DCD7D0]">
               <img 
-                src="https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=600&q=80" 
+                src="https://drive.google.com/uc?export=view&id=1LbRicR37mDR0RcybFFEeekXl-1bHUQ4t" 
                 alt="Sarees" 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
