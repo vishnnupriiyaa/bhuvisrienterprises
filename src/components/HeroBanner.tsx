@@ -93,7 +93,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
             </div>
             <div className="w-full aspect-3/4 bg-[#F0EDE9] mb-4 overflow-hidden border border-[#DCD7D0]">
               <img 
-                src="https://drive.google.com/uc?export=view&id=1LbRicR37mDR0RcybFFEeekXl-1bHUQ4t" 
+                src="https://drive.usercontent.google.com/download?id=1LbRicR37mDR0RcybFFEeekXl-1bHUQ4t&export=view&authuser=0" 
                 alt="Sarees" 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
