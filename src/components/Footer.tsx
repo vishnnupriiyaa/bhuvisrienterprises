@@ -1,16 +1,14 @@
 import React, { useState } from 'react';
-import { MessageCircle, ShieldCheck, Truck, Scissors, ArrowRight, Check } from 'lucide-react';
+import { MessageCircle, ShieldCheck, Truck, ArrowRight, Check } from 'lucide-react';
 import { generateWhatsAppLink } from '../utils/formatters';
 
 interface FooterProps {
   onOpenOrderLookup: () => void;
-  onOpenCustomStudio: () => void;
   onOpenAdmin: () => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({
   onOpenOrderLookup,
-  onOpenCustomStudio,
   onOpenAdmin,
 }) => {
   const [newsletterEmail, setNewsletterEmail] = useState('');
@@ -24,7 +22,7 @@ export const Footer: React.FC<FooterProps> = ({
   };
 
   const handleDirectWhatsApp = () => {
-    const link = generateWhatsAppLink('919876543210', 'Namaste BhuviSri Enterprises! ✨ I would like styling assistance.');
+    const link = generateWhatsAppLink('8008889317', 'Namaste BhuviSri Enterprises! ✨ I would like styling assistance.');
     window.open(link, '_blank');
   };
 
@@ -105,11 +103,6 @@ export const Footer: React.FC<FooterProps> = ({
                 <a href="mailto:bhuvisri.enterprises@gmail.com" className="hover:text-white transition-colors">
                   bhuvisri.enterprises@gmail.com
                 </a>
-              </li>
-              <li>
-                <button onClick={onOpenCustomStudio} className="hover:text-white transition-colors text-left cursor-pointer">
-                  Bespoke Tailoring Atelier
-                </button>
               </li>
               <li>
                 <button onClick={onOpenOrderLookup} className="hover:text-white transition-colors text-left cursor-pointer">

@@ -1,17 +1,12 @@
 import React from 'react';
-import { Sparkles, ArrowRight, Shield, Award, MessageCircle, Scissors } from 'lucide-react';
 import { ProductCategory } from '../types';
 
 interface HeroBannerProps {
-  onSelectCategory: (cat: ProductCategory | 'all' | 'custom_studio') => void;
-  onOpenCustomStudio: () => void;
-  onOpenWhatsApp: () => void;
+  onSelectCategory: (cat: ProductCategory | 'all') => void;
 }
 
 export const HeroBanner: React.FC<HeroBannerProps> = ({
   onSelectCategory,
-  onOpenCustomStudio,
-  onOpenWhatsApp,
 }) => {
   return (
     <div id="hero-geometric-balance" className="flex flex-col border-b border-[#DCD7D0]">
@@ -43,13 +38,6 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
             >
               Shop Western
             </button>
-            <button
-              id="hero-custom-order-btn"
-              onClick={onOpenCustomStudio}
-              className="px-8 py-3 border border-[#2A2A2A] text-[#2A2A2A] text-[11px] uppercase tracking-[0.2em] hover:bg-[#2A2A2A] hover:text-white transition-colors cursor-pointer"
-            >
-              Custom Order
-            </button>
           </div>
         </div>
 
@@ -57,7 +45,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
         <div className="w-full lg:w-1/2 bg-[#EAE5DF] p-8 sm:p-12 flex items-center justify-center relative min-h-[360px] lg:min-h-[440px]">
           <div className="w-full h-full max-h-[380px] border border-[#DCD7D0] relative overflow-hidden group shadow-xs">
             <img
-              src="/images/hero-large.jpg"
+              src="/images/hero-sarees.jpg"
               alt="BhuviSri Enterprises Silk Drape"
               className="w-full h-full object-cover object-center transform group-hover:scale-105 transition-transform duration-700"
             />
@@ -82,7 +70,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
       {/* 4-Column Geometric Category Showcase */}
       <section className="grid grid-cols-2 md:grid-cols-4 bg-[#F5F2ED]">
         
-        {/* 01 / Sarees */}
+        {/* Sarees */}
         <div
           onClick={() => onSelectCategory('sarees')}
           className="border-b md:border-b-0 border-r border-[#DCD7D0] p-6 sm:p-8 flex flex-col justify-between group hover:bg-white transition-colors cursor-pointer"
@@ -93,7 +81,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
             </div>
             <div className="w-full aspect-3/4 bg-[#F0EDE9] mb-4 overflow-hidden border border-[#DCD7D0]">
               <img 
-                src="/images/sarees-card.jpg" 
+                src="/images/hero-sarees.jpg" 
                 alt="Sarees" 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
@@ -105,7 +93,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
           </div>
         </div>
 
-        {/* 02 / Ethnic */}
+        {/*  Ethnic */}
         <div
           onClick={() => onSelectCategory('ethnic')}
           className="border-b md:border-b-0 border-r border-[#DCD7D0] p-6 sm:p-8 flex flex-col justify-between group hover:bg-white transition-colors cursor-pointer"
@@ -116,19 +104,19 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
             </div>
             <div className="w-full aspect-3/4 bg-[#F0EDE9] mb-4 overflow-hidden border border-[#DCD7D0]">
               <img 
-                src="/images/category-ethnic.jpg" 
+                src="/images/ethnic-temp.jpg" 
                 alt="Ethnic" 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
             </div>
           </div>
           <div className="text-sm font-serif italic text-[#2A2A2A] flex items-center justify-between">
-            <span>Ritual Roots</span>
+            <span>ethnic wear</span>
             <span className="text-xs tracking-widest uppercase opacity-0 group-hover:opacity-100 transition-opacity">→</span>
           </div>
         </div>
 
-        {/* 03 / Western */}
+        {/*  Western */}
         <div
           onClick={() => onSelectCategory('western')}
           className="border-r border-[#DCD7D0] p-6 sm:p-8 flex flex-col justify-between group hover:bg-white transition-colors cursor-pointer"
@@ -139,19 +127,19 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
             </div>
             <div className="w-full aspect-3/4 bg-[#F0EDE9] mb-4 overflow-hidden border border-[#DCD7D0]">
               <img 
-                src="/images/category-western.jpg" 
+                src="/images/western-temp.jpg" 
                 alt="Western" 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
             </div>
           </div>
           <div className="text-sm font-serif italic text-[#2A2A2A] flex items-center justify-between">
-            <span>Urban Chic</span>
+            <span>western wear</span>
             <span className="text-xs tracking-widest uppercase opacity-0 group-hover:opacity-100 transition-opacity">→</span>
           </div>
         </div>
 
-        {/* 04 / Accessories & Jewels */}
+        {/*  Accessories & Jewels */}
         <div
           onClick={() => onSelectCategory('accessories')}
           className="p-6 sm:p-8 flex flex-col justify-between group hover:bg-white transition-colors cursor-pointer"
@@ -162,14 +150,14 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
             </div>
             <div className="w-full aspect-3/4 bg-[#F0EDE9] mb-4 overflow-hidden border border-[#DCD7D0]">
               <img 
-                src="/images/category-accessories.jpg" 
+                src="/images/jewels-bags-temp.jpg" 
                 alt="Accessories" 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
             </div>
           </div>
           <div className="text-sm font-serif italic text-[#2A2A2A] flex items-center justify-between">
-            <span>Finishing Touches</span>
+            <span>accessories & jewels</span>
             <span className="text-xs tracking-widest uppercase opacity-0 group-hover:opacity-100 transition-opacity">→</span>
           </div>
         </div>

@@ -7,15 +7,13 @@ import {
   ShieldCheck, 
   Menu, 
   X, 
-  Sparkles,
-  Truck,
-  Scissors
+  Truck
 } from 'lucide-react';
 import { ProductCategory, UserProfile } from '../types';
 
 interface NavbarProps {
-  activeCategory: ProductCategory | 'all' | 'custom_studio';
-  onSelectCategory: (cat: ProductCategory | 'all' | 'custom_studio') => void;
+  activeCategory: ProductCategory | 'all';
+  onSelectCategory: (cat: ProductCategory | 'all') => void;
   cartCount: number;
   wishlistCount: number;
   onOpenCart: () => void;
@@ -23,7 +21,6 @@ interface NavbarProps {
   onOpenAdmin: () => void;
   onOpenUserAccount: () => void;
   onOpenOrderLookup: () => void;
-  onOpenCustomStudio: () => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
   currency: 'INR' | 'USD';
@@ -42,7 +39,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAdmin,
   onOpenUserAccount,
   onOpenOrderLookup,
-  onOpenCustomStudio,
   searchQuery,
   onSearchChange,
   currency,
@@ -95,7 +91,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Main Architectural Navigation Bar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-8">
-        <div className="flex items-center justify-between h-20 gap-4">
+        <div className="flex items-center justify-between h-20 gap-1 sm:gap-4">
           
           {/* Left Categories (Desktop) */}
           <div className="hidden lg:flex items-center gap-7 text-[11px] uppercase tracking-[0.2em] font-medium text-[#2A2A2A]">
@@ -131,15 +127,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               Western
             </button>
-            <button
-              onClick={onOpenCustomStudio}
-              className={`hover:opacity-60 transition-opacity flex items-center gap-1 text-[#A68A64] cursor-pointer ${
-                activeCategory === 'custom_studio' ? 'font-bold border-b border-[#A68A64] pb-0.5' : ''
-              }`}
-            >
-              <Scissors size={12} />
-              <span>Customized</span>
-            </button>
           </div>
 
           {/* Mobile menu trigger */}
@@ -155,12 +142,12 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           {/* Brand Logo - Geometric & Serif Italic Luxury */}
-          <div className="text-center">
+          <div className="min-w-0 text-center">
             <button 
               onClick={() => { onSelectCategory('all'); }}
               className="inline-flex flex-col items-center group cursor-pointer"
             >
-              <span className="font-serif text-2xl sm:text-3xl tracking-[0.12em] uppercase italic text-[#2A2A2A] group-hover:opacity-80 transition-opacity">
+              <span className="font-serif text-xl sm:text-3xl tracking-[0.12em] uppercase italic text-[#2A2A2A] group-hover:opacity-80 transition-opacity">
                 BhuviSri Enterprises
               </span>
               <span className="text-[9px] uppercase tracking-[0.4em] text-[#A68A64] font-medium -mt-1">
@@ -170,7 +157,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           {/* Right Action Icons & Auth */}
-          <div className="flex items-center gap-4 sm:gap-6 text-[11px] uppercase tracking-[0.2em] font-medium">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-6 text-[11px] uppercase tracking-[0.2em] font-medium">
             
             {/* Search Toggle / Input */}
             <div className="relative">
@@ -234,7 +221,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               id="cart-drawer-trigger-btn"
               onClick={onOpenCart}
-              className="flex items-center gap-2 bg-[#2A2A2A] text-white px-4 py-2 hover:bg-[#404040] transition-colors cursor-pointer text-[10px] tracking-[0.2em] uppercase font-bold"
+              className="flex items-center justify-center gap-2 bg-[#2A2A2A] text-white p-2 sm:px-4 hover:bg-[#404040] transition-colors cursor-pointer text-[10px] tracking-[0.2em] uppercase font-bold"
             >
               <div className="relative">
                 <ShoppingBag size={15} />
@@ -276,17 +263,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 ))}
               </div>
             </div>
-
-            <button
-              onClick={() => {
-                onOpenCustomStudio();
-                setMobileMenuOpen(false);
-              }}
-              className="flex items-center justify-center gap-2 bg-[#2A2A2A] text-white py-3 text-[11px] uppercase tracking-[0.2em] font-medium"
-            >
-              <Scissors size={14} className="text-[#A68A64]" />
-              <span>Bespoke Tailoring Studio</span>
-            </button>
 
             <div className="pt-2 flex flex-col space-y-2 border-t border-[#DCD7D0] text-[11px] text-[#2A2A2A]">
               <button

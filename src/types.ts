@@ -113,24 +113,6 @@ export interface Order {
   }[];
 }
 
-export interface BespokeRequest {
-  id: string;
-  requestNumber: string;
-  customerName: string;
-  email: string;
-  phone: string;
-  category: string;
-  fabricPreference: string;
-  budgetRange: string;
-  targetDate: string;
-  description: string;
-  referenceImages: string[];
-  measurements?: Record<string, string>;
-  status: 'New Request' | 'Consultation Scheduled' | 'Design Drafted' | 'In Production' | 'Ready for Dispatch';
-  createdAt: string;
-  notes?: string;
-}
-
 export interface UserProfile {
   id: string;
   name: string;

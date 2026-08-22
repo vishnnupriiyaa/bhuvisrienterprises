@@ -4,7 +4,6 @@ import { HeroBanner } from './components/HeroBanner';
 import { CategoryNav } from './components/CategoryNav';
 import { ProductCard } from './components/ProductCard';
 import { ProductDetailsModal } from './components/ProductDetailsModal';
-import { CustomStudio } from './components/CustomStudio';
 import { CartDrawer } from './components/CartDrawer';
 import { CheckoutModal } from './components/CheckoutModal';
 import { AdminPortal } from './components/AdminPortal';
@@ -19,7 +18,6 @@ import {
   Product, 
   CartItem, 
   Order, 
-  BespokeRequest, 
   UserProfile, 
   ProductCategory, 
   CustomizationDetails, 
@@ -98,25 +96,6 @@ const mapOrderRow = (row: any): Order => ({
   notes: row.notes ?? undefined,
   timeline: row.timeline ?? [],
 });
-
-const mapBespokeRow = (row: any): BespokeRequest => ({
-  id: row.id,
-  requestNumber: row.request_number,
-  customerName: row.customer_name,
-  email: row.email,
-  phone: row.phone,
-  category: row.category,
-  fabricPreference: row.fabric_preference,
-  budgetRange: row.budget_range,
-  targetDate: row.target_date,
-  description: row.description,
-  referenceImages: row.reference_images ?? [],
-  measurements: row.measurements ?? {},
-  status: row.status,
-  createdAt: row.created_at,
-  notes: row.notes ?? undefined,
-});
-
 const sendBusinessEmail = async (event: string, to: string, subject: string, text: string) => {
   const { error } = await supabase.functions.invoke('send-business-email', {
     body: { event, to, subject, text },
@@ -166,23 +145,7 @@ export default function App() {
     setIsOrdersLoading(false);
   };
 
-  // 3. Bespoke Requests State - loaded from Supabase
-  const [bespokeRequests, setBespokeRequests] = useState<BespokeRequest[]>([]);
-
-  const loadBespokeRequests = async () => {
-    const { data, error } = await supabase
-      .from('bespoke_requests')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (error) {
-      console.error('Failed to load bespoke requests:', error);
-      setBespokeRequests([]);
-    } else {
-      setBespokeRequests((data ?? []).map(mapBespokeRow));
-    }
-  };
-
-  // 4. Persistent Shopping Bag
+  // 3. Persistent Shopping Bag
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
       const saved = localStorage.getItem('Bhuvisrienterprises_cart');
@@ -192,10 +155,10 @@ export default function App() {
     }
   });
 
-  // 5. Persistent Wishlist
+  // 4. Persistent Wishlist
   const [wishlist, setWishlist] = useState<Product[]>([]);
 
-  // 6. User Profile & Admin Auth
+  // 5. User Profile & Admin Auth
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
@@ -278,10 +241,6 @@ export default function App() {
     if (currentUser) loadOrders();
   }, [currentUser]);
 
-  useEffect(() => {
-    if (currentUser) loadBespokeRequests();
-  }, [currentUser]);
-
   // Cart is temporary browser UI state; business records are stored in Supabase.
   useEffect(() => {
     localStorage.setItem('Bhuvisrienterprises_cart', JSON.stringify(cart));
@@ -291,7 +250,7 @@ export default function App() {
   const [currency, setCurrency] = useState<'INR' | 'USD'>('INR');
 
   // Navigation & Filtering State
-  const [activeCategory, setActiveCategory] = useState<ProductCategory | 'all' | 'custom_studio'>('all');
+  const [activeCategory, setActiveCategory] = useState<ProductCategory | 'all'>('all');
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>('All Items');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('featured');
@@ -305,7 +264,6 @@ export default function App() {
   // Modals / Drawers State
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
-  const [isCustomStudioOpen, setIsCustomStudioOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isAdminPortalOpen, setIsAdminPortalOpen] = useState(false);
@@ -485,39 +443,6 @@ export default function App() {
     return true;
   };
 
-  // Bespoke submission
-  const handleSubmitBespoke = async (request: BespokeRequest) => {
-    const { error } = await supabase.from('bespoke_requests').insert({
-      user_id: currentUser?.id ?? null,
-      request_number: request.requestNumber,
-      customer_name: request.customerName,
-      email: request.email,
-      phone: request.phone,
-      category: request.category,
-      fabric_preference: request.fabricPreference,
-      budget_range: request.budgetRange,
-      target_date: request.targetDate || null,
-      description: request.description,
-      reference_images: request.referenceImages,
-      measurements: request.measurements ?? {},
-      status: request.status,
-      notes: request.notes ?? null,
-    });
-
-    if (error) {
-      console.error('Failed to create bespoke request:', error);
-      return;
-    }
-
-    await loadBespokeRequests();
-    await sendBusinessEmail(
-      'bespoke_request_confirmation',
-      request.email,
-      `Bespoke request confirmation ${request.requestNumber}`,
-      `Your BhuviSri Enterprises bespoke request ${request.requestNumber} has been received.`,
-    );
-  };
-
   // Product Add / Update / Delete (Brand Owner)
   const getSupabaseProductPayload = (product: Product) => ({
     sku: product.sku,
@@ -633,13 +558,6 @@ export default function App() {
     });
   };
 
-  const handleUpdateBespokeStatus = (requestId: string, newStatus: BespokeRequest['status']) => {
-    supabase.from('bespoke_requests').update({ status: newStatus }).eq('id', requestId).then(({ error }) => {
-      if (error) console.error('Failed to update bespoke status:', error);
-      else loadBespokeRequests();
-    });
-  };
-
   // Admin login
   const handleAdminLogin = async (email: string, password: string): Promise<{ success: boolean; reason?: 'invalid_credentials' | 'not_authorized' | 'error' }> => {
     const trimmedEmail = email.trim();
@@ -750,12 +668,8 @@ export default function App() {
       <Navbar
         activeCategory={activeCategory}
         onSelectCategory={(cat) => {
-          if (cat === 'custom_studio') {
-            setIsCustomStudioOpen(true);
-          } else {
-            setActiveCategory(cat);
-            setSelectedSubcategory('All Items');
-          }
+          setActiveCategory(cat);
+          setSelectedSubcategory('All Items');
         }}
         cartCount={cart.reduce((acc, i) => acc + i.quantity, 0)}
         wishlistCount={wishlist.length}
@@ -764,7 +678,6 @@ export default function App() {
         onOpenAdmin={() => setIsAdminPortalOpen(true)}
         onOpenUserAccount={() => setIsUserAccountOpen(true)}
         onOpenOrderLookup={() => setIsOrderLookupOpen(true)}
-        onOpenCustomStudio={() => setIsCustomStudioOpen(true)}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         currency={currency}
@@ -779,19 +692,10 @@ export default function App() {
         {/* Editorial Hero Banner */}
         <HeroBanner
           onSelectCategory={(cat) => {
-            if (cat === 'custom_studio') {
-              setIsCustomStudioOpen(true);
-            } else {
-              setActiveCategory(cat);
-              setSelectedSubcategory('All Items');
-              const el = document.getElementById('catalog-products-grid');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
-            }
-          }}
-          onOpenCustomStudio={() => setIsCustomStudioOpen(true)}
-          onOpenWhatsApp={() => {
-            const link = generateWhatsAppLink('919876543210', 'Namaste BhuviSri Enterprises! ✨ I would like assistance with saree draping & custom sizing.');
-            window.open(link, '_blank');
+            setActiveCategory(cat);
+            setSelectedSubcategory('All Items');
+            const el = document.getElementById('catalog-products-grid');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
           }}
         />
 
@@ -799,12 +703,8 @@ export default function App() {
         <CategoryNav
           activeCategory={activeCategory}
           onSelectCategory={(cat) => {
-            if (cat === 'custom_studio') {
-              setIsCustomStudioOpen(true);
-            } else {
-              setActiveCategory(cat);
-              setSelectedSubcategory('All Items');
-            }
+            setActiveCategory(cat);
+            setSelectedSubcategory('All Items');
           }}
           selectedSubcategory={selectedSubcategory}
           onSelectSubcategory={setSelectedSubcategory}
@@ -880,7 +780,6 @@ export default function App() {
       {/* Footer */}
       <Footer
         onOpenOrderLookup={() => setIsOrderLookupOpen(true)}
-        onOpenCustomStudio={() => setIsCustomStudioOpen(true)}
         onOpenAdmin={() => setIsAdminPortalOpen(true)}
       />
 
@@ -904,14 +803,7 @@ export default function App() {
         onAddReview={handleAddReview}
       />
 
-      {/* 2. Bespoke Custom Tailoring Atelier Studio */}
-      <CustomStudio
-        isOpen={isCustomStudioOpen}
-        onClose={() => setIsCustomStudioOpen(false)}
-        onSubmitBespoke={handleSubmitBespoke}
-      />
-
-      {/* 3. Shopping Bag Drawer */}
+      {/* 2. Shopping Bag Drawer */}
       <CartDrawer
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
@@ -925,7 +817,7 @@ export default function App() {
         discount={discountAmount}
       />
 
-      {/* 4. Secure Checkout & Payment Gateway */}
+      {/* 3. Secure Checkout & Payment Gateway */}
       <CheckoutModal
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
@@ -941,24 +833,22 @@ export default function App() {
         } : undefined}
       />
 
-      {/* 5. Brand Owner / Admin Portal */}
+      {/* 4. Brand Owner / Admin Portal */}
       <AdminPortal
         isOpen={isAdminPortalOpen}
         onClose={() => setIsAdminPortalOpen(false)}
         products={products}
         orders={orders}
-        bespokeRequests={bespokeRequests}
         onAddProduct={handleAddProduct}
         onUpdateProduct={handleUpdateProduct}
         onDeleteProduct={handleDeleteProduct}
         onUpdateOrderStatus={handleUpdateOrderStatus}
-        onUpdateBespokeStatus={handleUpdateBespokeStatus}
         isAdminLoggedIn={isAdminLoggedIn}
         onAdminLogin={handleAdminLogin}
         onAdminLogout={handleAdminLogout}
       />
 
-      {/* 6. Customer Account & Order History Modal */}
+      {/* 5. Customer Account & Order History Modal */}
       <UserAccountModal
         isOpen={isUserAccountOpen}
         onClose={() => setIsUserAccountOpen(false)}
@@ -967,7 +857,6 @@ export default function App() {
         onLogout={handleUserLogout}
         orders={orders}
         wishlist={wishlist}
-        bespokeRequests={bespokeRequests}
         currency={currency}
         onOpenProduct={(p) => {
           setSelectedProduct(p);
@@ -975,7 +864,7 @@ export default function App() {
         }}
       />
 
-      {/* 7. Public Order Tracking Lookup Modal */}
+      {/* 6. Public Order Tracking Lookup Modal */}
       <OrderTrackLookup
         isOpen={isOrderLookupOpen}
         onClose={() => setIsOrderLookupOpen(false)}

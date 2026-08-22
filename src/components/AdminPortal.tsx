@@ -2,10 +2,11 @@ import React, { useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { 
   ShieldCheck, 
+  Eye,
+  EyeOff,
   Package, 
   Upload, 
   Truck, 
-  Scissors, 
   Plus, 
   Trash2, 
   Edit3, 
@@ -22,7 +23,7 @@ import {
   CheckCircle2,
   AlertCircle
 } from 'lucide-react';
-import { Product, Order, BespokeRequest, OrderStatus, ProductCategory } from '../types';
+import { Product, Order, OrderStatus, ProductCategory } from '../types';
 import { formatCurrency, generateWhatsAppLink, getOrderWhatsAppText } from '../utils/formatters';
 
 interface AdminPortalProps {
@@ -30,12 +31,10 @@ interface AdminPortalProps {
   onClose: () => void;
   products: Product[];
   orders: Order[];
-  bespokeRequests: BespokeRequest[];
   onAddProduct: (product: Product) => void;
   onUpdateProduct: (product: Product) => void;
   onDeleteProduct: (productId: string) => void;
   onUpdateOrderStatus: (orderId: string, newStatus: OrderStatus, trackingNumber?: string, courierPartner?: string) => void;
-  onUpdateBespokeStatus: (requestId: string, newStatus: BespokeRequest['status']) => void;
   isAdminLoggedIn: boolean;
   onAdminLogin: (email: string, pass: string) => Promise<{ success: boolean; reason?: 'invalid_credentials' | 'not_authorized' | 'error' }>;
   onAdminLogout: () => void;
@@ -46,12 +45,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   onClose,
   products,
   orders,
-  bespokeRequests,
   onAddProduct,
   onUpdateProduct,
   onDeleteProduct,
   onUpdateOrderStatus,
-  onUpdateBespokeStatus,
   isAdminLoggedIn,
   onAdminLogin,
   onAdminLogout,
@@ -61,10 +58,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
   // Active Admin Tab
-  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'orders' | 'bespoke' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'orders' | 'settings'>('overview');
 
   // Product Manager State
   const [showAddProductModal, setShowAddProductModal] = useState(false);
@@ -106,7 +104,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('All');
 
   // Settings State
-  const [whatsappHelpline, setWhatsappHelpline] = useState('+91 98765 43210');
+  const [whatsappHelpline, setWhatsappHelpline] = useState('+91 80088 89317');
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -424,7 +422,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 </span>
               </div>
               <p className="text-[10px] text-[#A68A64] uppercase tracking-wider">
-                {isAdminLoggedIn ? 'Multi-Image Catalog • Orders • Bespoke Dockets' : 'Secure Passcode Authentication Required'}
+                {isAdminLoggedIn ? 'Multi-Image Catalog • Orders' : 'Secure Passcode Authentication Required'}
               </p>
             </div>
           </div>
@@ -480,14 +478,25 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
                 <div>
                   <label className="block text-[10px] uppercase tracking-wider text-[#6B655E] mb-1 font-bold">Password</label>
-                  <input
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your Supabase Auth password"
-                    className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 text-xs text-[#2A2A2A] focus:outline-none focus:border-[#2A2A2A]"
-                  />
+                  <div className="relative">
+                    <input
+                      type={isPasswordVisible ? 'text' : 'password'}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter your Supabase Auth password"
+                      className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 pr-10 text-xs text-[#2A2A2A] focus:outline-none focus:border-[#2A2A2A]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setIsPasswordVisible((visible) => !visible)}
+                      className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-[#6B655E] hover:text-[#2A2A2A] cursor-pointer"
+                      aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
+                      title={isPasswordVisible ? 'Hide password' : 'Show password'}
+                    >
+                      {isPasswordVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
                   <span className="text-[10px] text-[#6B655E] mt-1 block">
                     Use the password for the authorized admin account in Supabase Auth.
                   </span>
@@ -516,7 +525,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 { id: 'overview', label: 'Overview', icon: Sparkles },
                 { id: 'products', label: `Catalog (${products.length})`, icon: Package },
                 { id: 'orders', label: `Orders (${orders.length})`, icon: Truck },
-                { id: 'bespoke', label: `Bespoke (${bespokeRequests.length})`, icon: Scissors },
                 { id: 'settings', label: 'Settings', icon: Settings },
               ].map((tab) => {
                 const Icon = tab.icon;
@@ -544,7 +552,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               {activeTab === 'overview' && (
                 <div className="space-y-6">
                   {/* KPI Cards */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div className="bg-[#EAE5DF] p-4 border border-[#DCD7D0]">
                       <span className="text-[10px] uppercase tracking-wider text-[#6B655E] block font-bold">Gross Sales</span>
                       <p className="font-serif italic text-2xl text-[#2A2A2A] mt-1 font-bold">
@@ -559,14 +567,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         {activeOrdersCount} Orders
                       </p>
                       <span className="text-[10px] text-[#6B655E]">In crafting & transit</span>
-                    </div>
-
-                    <div className="bg-[#EAE5DF] p-4 border border-[#DCD7D0]">
-                      <span className="text-[10px] uppercase tracking-wider text-[#6B655E] block font-bold">Bespoke Inquiries</span>
-                      <p className="font-serif italic text-2xl text-[#2A2A2A] mt-1 font-bold">
-                        {bespokeRequests.length} Dockets
-                      </p>
-                      <span className="text-[10px] text-[#6B655E]">WhatsApp consults ready</span>
                     </div>
 
                     <div className="bg-[#EAE5DF] p-4 border border-[#DCD7D0]">
@@ -622,14 +622,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       >
                         <Plus size={13} />
                         <span>Upload Product Photos</span>
-                      </button>
-
-                      <button
-                        onClick={() => setActiveTab('bespoke')}
-                        className="w-full py-2.5 px-4 bg-[#F5F2ED] border border-[#DCD7D0] text-[#2A2A2A] text-[10px] font-bold uppercase tracking-[0.2em] flex items-center justify-center gap-2 cursor-pointer hover:border-[#2A2A2A]"
-                      >
-                        <Scissors size={13} />
-                        <span>Review Bespoke References</span>
                       </button>
 
                       <div className="p-3 bg-[#F5F2ED] border border-[#DCD7D0] text-[10px] text-[#2A2A2A] flex items-center gap-2">
@@ -848,103 +840,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 </div>
               )}
 
-              {/* TAB 4: BESPOKE REQUESTS WITH CUSTOM PHOTO REFERENCES */}
-              {activeTab === 'bespoke' && (
-                <div className="space-y-4">
-                  <div className="bg-[#EAE5DF] border border-[#DCD7D0] p-4">
-                    <h2 className="font-bold text-[10px] uppercase tracking-[0.25em] text-[#2A2A2A] mb-3">Custom Made-to-Measure Dockets</h2>
-                    
-                    <div className="space-y-3">
-                      {bespokeRequests.map((req) => (
-                        <div key={req.id} className="p-4 bg-[#F5F2ED] border border-[#DCD7D0] space-y-3">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-sm text-[#2A2A2A]">{req.customerName}</span>
-                                <span className="font-mono text-xs text-[#6B655E]">({req.requestNumber})</span>
-                              </div>
-                              <p className="text-xs text-[#6B655E]">{req.phone} • {req.email}</p>
-                            </div>
-
-                            <select
-                              value={req.status}
-                              onChange={(e) => onUpdateBespokeStatus(req.id, e.target.value as any)}
-                              className="bg-[#EAE5DF] border border-[#DCD7D0] px-2.5 py-1 text-xs text-[#2A2A2A]"
-                            >
-                              <option value="New Request">New Request</option>
-                              <option value="Consultation Scheduled">Consultation Scheduled</option>
-                              <option value="Design Drafted">Design Drafted</option>
-                              <option value="In Production">In Production</option>
-                              <option value="Ready for Dispatch">Ready for Dispatch</option>
-                            </select>
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-[#EAE5DF] p-3 border border-[#DCD7D0]">
-                            <div>
-                              <span className="text-[#6B655E] block text-[10px] uppercase">Garment:</span>
-                              <strong>{req.category}</strong>
-                            </div>
-                            <div>
-                              <span className="text-[#6B655E] block text-[10px] uppercase">Date & Budget:</span>
-                              <strong>{req.targetDate} ({req.budgetRange})</strong>
-                            </div>
-                            <div>
-                              <span className="text-[#6B655E] block text-[10px] uppercase">Measurements:</span>
-                              <strong>Bust {req.measurements?.bust || '-'}, Waist {req.measurements?.waist || '-'}</strong>
-                            </div>
-                          </div>
-
-                          {/* Client Uploaded Reference Photos */}
-                          {req.referenceImages && req.referenceImages.length > 0 && (
-                            <div className="bg-[#EAE5DF] p-3 border border-[#DCD7D0] space-y-2">
-                              <span className="block text-[10px] uppercase font-bold text-[#6B655E] tracking-wider">
-                                Client Reference & Inspiration Photos ({req.referenceImages.length})
-                              </span>
-                              <div className="flex gap-2 flex-wrap">
-                                {req.referenceImages.map((refImg, rIdx) => (
-                                  <a 
-                                    key={rIdx} 
-                                    href={refImg} 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className="relative w-16 h-20 border border-[#DCD7D0] overflow-hidden hover:opacity-80 transition-opacity cursor-zoom-in"
-                                  >
-                                    <img src={refImg} alt={`Reference ${rIdx + 1}`} className="w-full h-full object-cover" />
-                                  </a>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {req.description && (
-                            <p className="text-xs text-[#2A2A2A] bg-[#EAE5DF] p-2.5 border border-[#DCD7D0]">
-                              <strong>Client Notes:</strong> {req.description}
-                            </p>
-                          )}
-
-                          <div className="flex justify-between items-center pt-2">
-                            <span className="text-[10px] text-[#6B655E]">Logged: {req.createdAt}</span>
-
-                            <button
-                              onClick={() => {
-                                const msg = `Hello ${req.customerName}! 🌸\nThis is the Master Designer from BhuviSri Enterprises regarding your Bespoke Custom Request (#${req.requestNumber} - ${req.category}).\nWe have reviewed your references and would love to schedule a video drape call.`;
-                                const link = generateWhatsAppLink(req.phone, msg);
-                                window.open(link, '_blank');
-                              }}
-                              className="px-3.5 py-1.5 bg-[#25D366] text-white text-[10px] font-bold uppercase tracking-[0.2em] flex items-center gap-1.5 cursor-pointer"
-                            >
-                              <MessageCircle size={13} />
-                              <span>WhatsApp Drape Consult</span>
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 5: SETTINGS */}
+              {/* TAB 4: SETTINGS */}
               {activeTab === 'settings' && (
                 <div className="max-w-xl space-y-6 text-xs">
                   <div className="bg-[#EAE5DF] p-5 border border-[#DCD7D0] space-y-3">

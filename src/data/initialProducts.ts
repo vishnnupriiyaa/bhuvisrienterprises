@@ -1,4 +1,4 @@
-import { Product, Order, BespokeRequest } from '../types';
+import { Product, Order } from '../types';
 
 export const INITIAL_PRODUCTS: Product[] = [
   // SAREES
@@ -747,47 +747,3 @@ export const INITIAL_ORDERS: Order[] = [
   }
 ];
 
-export const INITIAL_BESPOKE_REQUESTS: BespokeRequest[] = [
-  {
-    id: 'besp-101',
-    requestNumber: 'REQ-2026-091',
-    customerName: 'Meenakshi Sundaram',
-    email: 'meenakshi.s@outlook.com',
-    phone: '+91 97112 34567',
-    category: 'Bridal Kanjeevaram Saree & Custom Blouse',
-    fabricPreference: 'Pure Kanchipuram Korvai Silk in Ivory & Rose Gold',
-    budgetRange: '₹40,000 - ₹60,000',
-    targetDate: '2026-11-15',
-    description: 'Looking for a temple border traditional Kanjeevaram with custom embroidered lord ganesha and peacock motifs on the blouse back. Need bridal styling consultation via WhatsApp.',
-    referenceImages: [
-      'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=800&q=80'
-    ],
-    measurements: {
-      bust: '38 in',
-      waist: '32 in',
-      shoulder: '15 in',
-      blouseLength: '14.5 in'
-    },
-    status: 'Consultation Scheduled',
-    createdAt: '2026-08-15',
-    notes: 'Virtual WhatsApp consultation booked for Saturday 3:00 PM with master designer.'
-  },
-  {
-    id: 'besp-102',
-    requestNumber: 'REQ-2026-092',
-    customerName: 'Natasha Verma',
-    email: 'natasha.verma@fashionlaw.com',
-    phone: '+91 98990 12345',
-    category: 'Indo-Western Silk Blazer Gown',
-    fabricPreference: 'Sand Washed Raw Silk in Latte Beige',
-    budgetRange: '₹25,000 - ₹35,000',
-    targetDate: '2026-09-28',
-    description: 'Need a structured floor-length blazer gown for an international design awards ceremony in Dubai.',
-    referenceImages: [
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80'
-    ],
-    status: 'New Request',
-    createdAt: '2026-08-17',
-    notes: 'Pending swatch confirmation.'
-  }
-];

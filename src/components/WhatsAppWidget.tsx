@@ -3,7 +3,7 @@ import { MessageCircle } from 'lucide-react';
 
 export const WhatsAppWidget: React.FC = () => {
   const openWhatsApp = () => {
-    window.open('https://wa.me/919876543210', '_blank', 'noopener,noreferrer');
+    window.open('https://wa.me/ +91 8008889317', '_blank', 'noopener,noreferrer');
   };
 
   return (

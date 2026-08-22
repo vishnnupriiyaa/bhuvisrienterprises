@@ -6,11 +6,12 @@ import {
   LogOut, 
   X, 
   Check, 
+  Eye,
+  EyeOff,
   MessageCircle, 
-  Scissors, 
   ShieldCheck
 } from 'lucide-react';
-import { UserProfile, Order, Product, BespokeRequest } from '../types';
+import { UserProfile, Order, Product } from '../types';
 import { formatCurrency, generateWhatsAppLink, getOrderWhatsAppText } from '../utils/formatters';
 import { supabase } from '../lib/supabase';
 
@@ -22,7 +23,6 @@ interface UserAccountModalProps {
   onLogout: () => void;
   orders: Order[];
   wishlist: Product[];
-  bespokeRequests: BespokeRequest[];
   currency: 'INR' | 'USD';
   onOpenProduct: (product: Product) => void;
 }
@@ -35,13 +35,12 @@ export const UserAccountModal: React.FC<UserAccountModalProps> = ({
   onLogout,
   orders,
   wishlist,
-  bespokeRequests,
   currency,
   onOpenProduct,
 }) => {
   if (!isOpen) return null;
 
-  const [activeTab, setActiveTab] = useState<'orders' | 'bespoke' | 'wishlist'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'wishlist'>('orders');
   
   // Login / Register Form State
   const [isRegisterMode, setIsRegisterMode] = useState(false);
@@ -49,6 +48,7 @@ export const UserAccountModal: React.FC<UserAccountModalProps> = ({
   const [loginName, setLoginName] = useState('Priya Sharma');
   const [loginPhone, setLoginPhone] = useState('+91 98765 43210');
   const [loginPassword, setLoginPassword] = useState('');
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
   const handleCustomAuth = async (e: React.FormEvent) => {
@@ -96,7 +96,7 @@ export const UserAccountModal: React.FC<UserAccountModalProps> = ({
                 {currentUser ? `Namaste, ${currentUser.name}` : 'Client Sanctuary & Account'}
               </h1>
               <p className="text-[10px] uppercase tracking-wider text-[#6B655E]">
-                {currentUser ? currentUser.email : 'Sign in to access your orders and bespoke dockets'}
+                {currentUser ? currentUser.email : 'Sign in to access your orders'}
               </p>
             </div>
           </div>
@@ -129,7 +129,7 @@ export const UserAccountModal: React.FC<UserAccountModalProps> = ({
                 {isRegisterMode ? 'Create Account' : 'Welcome Back'}
               </h2>
               <p className="text-xs text-[#6B655E] font-light">
-                Manage bespoke orders and real-time tailoring status.
+                Manage your orders and account details.
               </p>
             </div>
 
@@ -170,14 +170,25 @@ export const UserAccountModal: React.FC<UserAccountModalProps> = ({
 
               <div>
                 <label className="block text-[10px] uppercase tracking-wider text-[#6B655E] mb-1 font-bold">Password *</label>
-                <input
-                  type="password"
-                  required
-                  minLength={6}
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 text-xs text-[#2A2A2A]"
-                />
+                <div className="relative">
+                  <input
+                    type={isPasswordVisible ? 'text' : 'password'}
+                    required
+                    minLength={6}
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 pr-10 text-xs text-[#2A2A2A]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsPasswordVisible((visible) => !visible)}
+                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-[#6B655E] hover:text-[#2A2A2A] cursor-pointer"
+                    aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
+                    title={isPasswordVisible ? 'Hide password' : 'Show password'}
+                  >
+                    {isPasswordVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
 
               {authError && <p className="text-xs text-[#2A2A2A] font-bold">{authError}</p>}
@@ -206,7 +217,6 @@ export const UserAccountModal: React.FC<UserAccountModalProps> = ({
             <div className="bg-[#EAE5DF] px-6 border-b border-[#DCD7D0] flex items-center space-x-6 text-[10px] font-bold uppercase tracking-[0.2em] overflow-x-auto">
               {[
                 { id: 'orders', label: `My Orders (${orders.length})`, icon: Package },
-                { id: 'bespoke', label: `Bespoke (${bespokeRequests.length})`, icon: Scissors },
                 { id: 'wishlist', label: `Wishlist (${wishlist.length})`, icon: Heart },
               ].map((t) => {
                 const Icon = t.icon;
@@ -257,7 +267,7 @@ export const UserAccountModal: React.FC<UserAccountModalProps> = ({
                             <button
                               onClick={() => {
                                 const msg = getOrderWhatsAppText(ord.orderNumber, ord.customer.name, ord.orderStatus);
-                                const link = generateWhatsAppLink('919876543210', msg);
+                                const link = generateWhatsAppLink('8008889317', msg);
                                 window.open(link, '_blank');
                               }}
                               className="p-1.5 bg-[#25D366] text-white cursor-pointer"
@@ -309,32 +319,6 @@ export const UserAccountModal: React.FC<UserAccountModalProps> = ({
                             ))}
                           </div>
                         </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-
-              {/* TAB: BESPOKE DOCKETS */}
-              {activeTab === 'bespoke' && (
-                <div className="space-y-4">
-                  {bespokeRequests.length === 0 ? (
-                    <div className="text-center py-12 text-xs uppercase tracking-widest text-[#6B655E]">
-                      <Scissors size={28} className="mx-auto mb-2 opacity-40" />
-                      <p>No bespoke customization requests logged.</p>
-                    </div>
-                  ) : (
-                    bespokeRequests.map((req) => (
-                      <div key={req.id} className="bg-[#EAE5DF] p-4 border border-[#DCD7D0] space-y-2.5 text-xs">
-                        <div className="flex justify-between items-center pb-2 border-b border-[#DCD7D0]">
-                          <span className="font-bold text-[#2A2A2A] uppercase tracking-wider text-[10px]">{req.category}</span>
-                          <span className="px-2 py-0.5 bg-[#2A2A2A] text-white text-[9px] font-bold uppercase tracking-wider">
-                            {req.status}
-                          </span>
-                        </div>
-                        <p className="text-[#6B655E]"><strong>Fabric:</strong> {req.fabricPreference}</p>
-                        <p className="text-[#6B655E]"><strong>Target Date:</strong> {req.targetDate}</p>
-                        <p className="text-[#6B655E]"><strong>Notes:</strong> {req.description}</p>
                       </div>
                     ))
                   )}

@@ -9,6 +9,8 @@ import {
   Truck, 
   Check, 
   Lock, 
+  Eye,
+  EyeOff,
   MessageCircle, 
   ArrowRight
 } from 'lucide-react';
@@ -63,6 +65,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [cardNumber, setCardNumber] = useState('4532 •••• •••• 8821');
   const [cardExpiry, setCardExpiry] = useState('08/29');
   const [cardCvv, setCardCvv] = useState('•••');
+  const [isCvvVisible, setIsCvvVisible] = useState(false);
   const [cardHolder, setCardHolder] = useState('PRIYA SHARMA');
 
   // Net banking state
@@ -185,7 +188,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const handleShareWhatsAppOrder = () => {
     if (!completedOrder) return;
     const msg = getOrderWhatsAppText(completedOrder.orderNumber, completedOrder.customer.name, 'Confirmed & In Production');
-    const link = generateWhatsAppLink('919876543210', msg);
+    const link = generateWhatsAppLink('8008889317', msg);
     window.open(link, '_blank');
   };
 
@@ -438,13 +441,24 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       </div>
                       <div>
                         <label className="block text-[10px] uppercase tracking-wider text-[#6B655E] mb-1">CVV</label>
-                        <input
-                          type="password"
-                          maxLength={4}
-                          value={cardCvv}
-                          onChange={(e) => setCardCvv(e.target.value)}
-                          className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 text-xs text-[#2A2A2A] font-mono"
-                        />
+                        <div className="relative">
+                          <input
+                            type={isCvvVisible ? 'text' : 'password'}
+                            maxLength={4}
+                            value={cardCvv}
+                            onChange={(e) => setCardCvv(e.target.value)}
+                            className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 pr-10 text-xs text-[#2A2A2A] font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setIsCvvVisible((visible) => !visible)}
+                            className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-[#6B655E] hover:text-[#2A2A2A] cursor-pointer"
+                            aria-label={isCvvVisible ? 'Hide CVV' : 'Show CVV'}
+                            title={isCvvVisible ? 'Hide CVV' : 'Show CVV'}
+                          >
+                            {isCvvVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

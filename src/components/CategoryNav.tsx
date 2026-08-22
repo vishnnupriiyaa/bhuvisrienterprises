@@ -3,8 +3,8 @@ import { Scissors, Sparkles } from 'lucide-react';
 import { ProductCategory } from '../types';
 
 interface CategoryNavProps {
-  activeCategory: ProductCategory | 'all' | 'custom_studio';
-  onSelectCategory: (cat: ProductCategory | 'all' | 'custom_studio') => void;
+  activeCategory: ProductCategory | 'all';
+  onSelectCategory: (cat: ProductCategory | 'all') => void;
   selectedSubcategory: string;
   onSelectSubcategory: (sub: string) => void;
   sortBy: string;

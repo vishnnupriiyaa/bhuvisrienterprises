@@ -136,7 +136,7 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({
       ? `\nI want custom tailoring with: ${blouseStyle}, ${sleeveLength}. Measurements: Bust ${measurements.bust}", Waist ${measurements.waist}".`
       : '';
     const msg = getProductWhatsAppText(product.name, product.sku, finalPrice) + customNote;
-    const link = generateWhatsAppLink('919876543210', msg);
+    const link = generateWhatsAppLink('8008889317', msg);
     window.open(link, '_blank');
   };
 

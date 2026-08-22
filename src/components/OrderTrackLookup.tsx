@@ -124,7 +124,7 @@ export const OrderTrackLookup: React.FC<OrderTrackLookupProps> = ({
                 <button
                   onClick={() => {
                     const msg = getOrderWhatsAppText(searchedOrder.orderNumber, searchedOrder.customer.name, searchedOrder.orderStatus);
-                    const link = generateWhatsAppLink('919876543210', msg);
+                    const link = generateWhatsAppLink('8008889317', msg);
                     window.open(link, '_blank');
                   }}
                   className="px-3.5 py-2 bg-[#25D366] text-white text-[10px] font-bold uppercase tracking-[0.2em] flex items-center gap-1.5 cursor-pointer"

@@ -34,7 +34,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const handleWhatsAppInquiry = (e: React.MouseEvent) => {
     e.stopPropagation();
     const msg = getProductWhatsAppText(product.name, product.sku, product.price);
-    const link = generateWhatsAppLink('919876543210', msg);
+    const link = generateWhatsAppLink('8008889317', msg);
     window.open(link, '_blank');
   };
 
