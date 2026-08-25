@@ -25,7 +25,6 @@ import {
 } from 'lucide-react';
 import { Product, ProductColorVariant, Order, OrderStatus, ProductCategory } from '../types';
 import { formatCurrency, generateWhatsAppLink, getOrderWhatsAppText } from '../utils/formatters';
-import { detectDominantColor } from '../utils/colorDetection';
 
 interface AdminPortalProps {
   isOpen: boolean;
@@ -83,7 +82,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [imageGallery, setImageGallery] = useState<string[]>([]);
   const [isDraggingImages, setIsDraggingImages] = useState(false);
   const [uploadStatusMsg, setUploadStatusMsg] = useState<string | null>(null);
-  const [autoDetectColor, setAutoDetectColor] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const initialColorVariant: ProductColorVariant = {
     id: 'variant-new-1',
@@ -99,9 +97,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [colorHex, setColorHex] = useState('#D4AF37');
   const [occasion, setOccasion] = useState('Weddings & Festive');
   const [description, setDescription] = useState('');
-  const [craftDetailsInput, setCraftDetailsInput] = useState('Pure certified artisanal handloom weave');
-  const [careInstructions, setCareInstructions] = useState('Dry clean only. Store in muslin cloth.');
   const [availableSizes, setAvailableSizes] = useState('Free Size (6.2m with blouse)');
+  // Retained (not editable in this form) so saving/editing a product doesn't wipe existing catalogue data.
+  const [craftDetails, setCraftDetails] = useState<string[]>(['Artisanal handloom craftsmanship']);
+  const [careInstructions, setCareInstructions] = useState('Dry clean only. Store in muslin cloth.');
   const [stockCount, setStockCount] = useState(10);
   const [inStock, setInStock] = useState(true);
   const [isBestSeller, setIsBestSeller] = useState(false);
@@ -175,28 +174,28 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   // Multiple File Processing using real Supabase Storage bucket.
   const processFiles = async (files: FileList | File[]) => {
-    if (!autoDetectColor && !activeColorVariantId) {
+    if (!activeColorVariantId) {
       setUploadStatusMsg('Select a colour variant before uploading photos.');
       setTimeout(() => setUploadStatusMsg(null), 3500);
       return;
     }
-    const maxImageSize = 5 * 1024 * 1024;
+    const maxImageSize = 15 * 1024 * 1024;
     const validImageFiles = Array.from(files).filter(
       file => file.type.startsWith('image/') && file.size <= maxImageSize,
     );
     if (validImageFiles.length === 0) {
-      setUploadStatusMsg('Please select image files no larger than 5 MB each.');
+      setUploadStatusMsg('Please select image files no larger than 15 MB each.');
       setTimeout(() => setUploadStatusMsg(null), 3500);
       return;
     }
 
     const skippedCount = Array.from(files).length - validImageFiles.length;
     setUploadStatusMsg(
-      `Uploading ${validImageFiles.length} photo(s)${autoDetectColor ? ' and detecting colours' : ` for ${color}`}${skippedCount ? `; skipped ${skippedCount}` : ''}...`,
+      `Uploading ${validImageFiles.length} photo(s) for ${color}${skippedCount ? `; skipped ${skippedCount}` : ''}...`,
     );
 
     try {
-      const uploaded = await Promise.all(validImageFiles.map(async (file) => {
+      const uploadedUrls = await Promise.all(validImageFiles.map(async (file) => {
         const safeName = `${Date.now()}-${Math.random().toString(16).slice(2)}-${file.name.replace(/\s+/g, '-').toLowerCase()}`;
         const { data, error } = await supabase.storage
           .from('product-images')
@@ -211,58 +210,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         }
 
         const publicUrl = supabase.storage.from('product-images').getPublicUrl(data.path).data.publicUrl;
-
-        let detected: { name: string; hex: string } | null = null;
-        if (autoDetectColor) {
-          try {
-            detected = await detectDominantColor(file);
-          } catch (detectionError) {
-            console.warn('Colour auto-detection failed for a photo, keeping it in the active colour group:', detectionError);
-          }
-        }
-        return { url: publicUrl, detected };
+        return publicUrl;
       }));
 
-      if (autoDetectColor) {
-        // Group each uploaded photo into a matching (or newly created) colour variant based on its detected colour.
-        let workingVariants = [...colorVariants];
-        let lastTouchedId = activeColorVariantId;
-
-        for (const { url, detected } of uploaded) {
-          const colorName = (detected?.name ?? color).trim() || 'Uncategorised';
-          const colorHexVal = detected?.hex ?? colorHex;
-          let variant = workingVariants.find(v => v.name.trim().toLowerCase() === colorName.toLowerCase());
-          if (!variant) {
-            variant = { id: `variant-${Date.now()}-${Math.random().toString(16).slice(2)}`, name: colorName, hex: colorHexVal, images: [] };
-            workingVariants = [...workingVariants, variant];
-          }
-          if (!variant.images.includes(url)) {
-            workingVariants = workingVariants.map(v => v.id === variant!.id ? { ...v, images: [...v.images, url] } : v);
-          }
-          lastTouchedId = variant.id;
-        }
-
-        setColorVariants(workingVariants);
-        const finalVariant = workingVariants.find(v => v.id === lastTouchedId) ?? workingVariants[0];
-        if (finalVariant) {
-          setActiveColorVariantId(finalVariant.id);
-          setColor(finalVariant.name);
-          setColorHex(finalVariant.hex);
-          setImageGallery([...finalVariant.images]);
-        }
-
-        const distinctColors = Array.from(new Set(uploaded.map(u => u.detected?.name).filter(Boolean))) as string[];
-        setUploadStatusMsg(
-          distinctColors.length
-            ? `Uploaded ${uploaded.length} photo(s) and auto-sorted into ${distinctColors.length} colour group(s): ${distinctColors.join(', ')}.`
-            : `Uploaded ${uploaded.length} photo(s).`
-        );
-      } else {
-        const uploadedUrls = uploaded.map(u => u.url);
-        setImageGallery(prev => [...prev, ...uploadedUrls.filter(url => !prev.includes(url))]);
-        setUploadStatusMsg(`Successfully uploaded ${uploadedUrls.length} image(s).`);
-      }
-      setTimeout(() => setUploadStatusMsg(null), 4500);
+      setImageGallery(prev => [...prev, ...uploadedUrls.filter(url => !prev.includes(url))]);
+      setUploadStatusMsg(`Successfully uploaded ${uploadedUrls.length} image(s).`);
+      setTimeout(() => setUploadStatusMsg(null), 3500);
     } catch (error) {
       console.error('Image upload failed:', error);
       setUploadStatusMsg('Image upload failed. Check Supabase Storage permissions and bucket configuration.');
@@ -300,7 +253,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   };
 
   // Bulk URL Adder (handles single URL or comma/newline separated URLs)
-  const handleAddImageUrls = async () => {
+  const handleAddImageUrls = () => {
     if (!imageUrlInput.trim()) return;
 
     const urls = imageUrlInput
@@ -308,54 +261,16 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       .map(u => u.trim())
       .filter(u => u.length > 0 && (u.startsWith('http://') || u.startsWith('https://')));
 
-    if (urls.length === 0) {
+    if (urls.length > 0) {
+      setUploadStatusMsg('External URLs are accepted for preview, but product images should be uploaded to Supabase Storage for production use.');
+      setImageGallery(prev => [...prev, ...urls]);
+      setImageUrlInput('');
+      setTimeout(() => setUploadStatusMsg(null), 4500);
+    } else {
       setUploadStatusMsg('Please enter valid image URLs starting with http:// or https://');
       setTimeout(() => setUploadStatusMsg(null), 4000);
-      return;
     }
-
-    setUploadStatusMsg('External URLs are accepted for preview, but product images should be uploaded to Supabase Storage for production use.');
-    setImageUrlInput('');
-
-    if (autoDetectColor) {
-      const detections = await Promise.all(urls.map(async (url) => {
-        try {
-          return { url, detected: await detectDominantColor(url) };
-        } catch (detectionError) {
-          console.warn('Colour auto-detection failed for a pasted URL, keeping it in the active colour group:', detectionError);
-          return { url, detected: null as { name: string; hex: string } | null };
-        }
-      }));
-
-      let workingVariants = [...colorVariants];
-      let lastTouchedId = activeColorVariantId;
-      for (const { url, detected } of detections) {
-        const colorName = (detected?.name ?? color).trim() || 'Uncategorised';
-        const colorHexVal = detected?.hex ?? colorHex;
-        let variant = workingVariants.find(v => v.name.trim().toLowerCase() === colorName.toLowerCase());
-        if (!variant) {
-          variant = { id: `variant-${Date.now()}-${Math.random().toString(16).slice(2)}`, name: colorName, hex: colorHexVal, images: [] };
-          workingVariants = [...workingVariants, variant];
-        }
-        if (!variant.images.includes(url)) {
-          workingVariants = workingVariants.map(v => v.id === variant!.id ? { ...v, images: [...v.images, url] } : v);
-        }
-        lastTouchedId = variant.id;
-      }
-      setColorVariants(workingVariants);
-      const finalVariant = workingVariants.find(v => v.id === lastTouchedId) ?? workingVariants[0];
-      if (finalVariant) {
-        setActiveColorVariantId(finalVariant.id);
-        setColor(finalVariant.name);
-        setColorHex(finalVariant.hex);
-        setImageGallery([...finalVariant.images]);
-      }
-    } else {
-      setImageGallery(prev => [...prev, ...urls.filter(url => !prev.includes(url))]);
-    }
-    setTimeout(() => setUploadStatusMsg(null), 4500);
   };
-
 
   // Image Reordering & Removal Controls
   const setCoverImage = (index: number) => {
@@ -400,10 +315,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     const normalizedSizes = availableSizes
       .split(',')
       .map((s) => s.trim())
-      .filter(Boolean);
-    const craftDetails = craftDetailsInput
-      .split(/\n|,/)
-      .map((line) => line.trim())
       .filter(Boolean);
     saveActiveVariantImages();
     const savedVariants = colorVariants.length
@@ -508,7 +419,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setImageGallery([...variants[0].images]);
     setOccasion(prod.occasion);
     setDescription(prod.description);
-    setCraftDetailsInput((prod.craftDetails ?? []).join('\n'));
+    setCraftDetails(prod.craftDetails ?? ['Artisanal handloom craftsmanship']);
     setCareInstructions(prod.careInstructions || 'Dry clean only. Store in muslin cloth.');
     setAvailableSizes(prod.availableSizes.join(', '));
     setStockCount(prod.stockCount);
@@ -535,7 +446,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setActiveColorVariantId(initialColorVariant.id);
     setOccasion('Weddings & Festive');
     setDescription('');
-    setCraftDetailsInput('Pure certified artisanal handloom weave');
+    setCraftDetails(['Artisanal handloom craftsmanship']);
     setCareInstructions('Dry clean only. Store in muslin cloth.');
     setAvailableSizes('Free Size (6.2m with blouse)');
     setStockCount(10);
@@ -1155,20 +1066,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     )}
                   </div>
 
-                  <label className="flex items-center gap-2 text-[10px] text-[#2A2A2A] bg-[#F5F2ED] border border-[#DCD7D0] p-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={autoDetectColor}
-                      onChange={(e) => setAutoDetectColor(e.target.checked)}
-                    />
-                    <span>
-                      <span className="font-bold uppercase tracking-wider">Auto-detect colour & sort photos</span>
-                      <span className="block text-[#6B655E] normal-case font-normal mt-0.5">
-                        Upload photos of any colour together — each photo's dominant colour is detected and it is grouped into the matching colour variant automatically.
-                      </span>
-                    </span>
-                  </label>
-
                   {/* Drag & Drop Multi-Image Zone */}
                   <div
                     onDragOver={handleDragOver}
@@ -1183,7 +1080,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   >
                     <Upload size={22} className="mx-auto text-[#2A2A2A] mb-1.5" />
                     <p className="font-bold text-xs text-[#2A2A2A]">
-                      {autoDetectColor ? 'Upload photos of all colours together' : `Upload one or many photos for ${color}`}
+                      Upload one or many photos for {color}
                     </p>
                     <p className="text-[10px] text-[#6B655E] mt-0.5">
                       or click to browse your computer (select multiple files: JPEG, PNG, WEBP)
@@ -1372,11 +1269,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <h3 className="text-[10px] uppercase tracking-wider font-bold text-[#2A2A2A]">Colour Variants</h3>
-                      <p className="text-[10px] text-[#6B655E] mt-1">
-                        {autoDetectColor
-                          ? 'Auto-detect is on — colour groups are created automatically as photos are uploaded.'
-                          : 'Each colour keeps its own photos. Select a colour before uploading.'}
-                      </p>
+                      <p className="text-[10px] text-[#6B655E] mt-1">Each colour keeps its own photos. Select a colour before uploading.</p>
                     </div>
                     <button
                       type="button"
@@ -1477,28 +1370,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Artisanal details, drape feel, blouse piece inclusion..."
-                    className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 text-xs text-[#2A2A2A]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] uppercase tracking-wider font-bold text-[#6B655E] mb-1">Craft Details (one per line)</label>
-                  <textarea
-                    rows={3}
-                    value={craftDetailsInput}
-                    onChange={(e) => setCraftDetailsInput(e.target.value)}
-                    placeholder="Handloom weave&#10;Antique zari border&#10;Made in small batches"
-                    className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 text-xs text-[#2A2A2A]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] uppercase tracking-wider font-bold text-[#6B655E] mb-1">Care Instructions</label>
-                  <textarea
-                    rows={2}
-                    value={careInstructions}
-                    onChange={(e) => setCareInstructions(e.target.value)}
-                    placeholder="Dry clean only. Store in muslin cloth."
                     className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 text-xs text-[#2A2A2A]"
                   />
                 </div>
