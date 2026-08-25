@@ -1,0 +1,6 @@
+BEGIN;
+
+ALTER TABLE public.products
+  ADD COLUMN IF NOT EXISTS color_variants jsonb NOT NULL DEFAULT '[]'::jsonb;
+
+COMMIT;

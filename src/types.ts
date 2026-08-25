@@ -1,4 +1,4 @@
-export type ProductCategory = 'sarees' | 'ethnic' | 'western' | 'accessories' | 'custom';
+export type ProductCategory = 'sarees' | 'ethnic' | 'western' | 'accessories' | 'gifts' | 'custom';
 
 export interface CustomizationDetails {
   blouseStyle?: string;
@@ -30,6 +30,13 @@ export interface Review {
   location?: string;
 }
 
+export interface ProductColorVariant {
+  id: string;
+  name: string;
+  hex: string;
+  images: string[];
+}
+
 export interface Product {
   id: string;
   sku: string;
@@ -43,6 +50,7 @@ export interface Product {
   fabric: string;
   color: string;
   colorHex: string;
+  colorVariants?: ProductColorVariant[];
   occasion: string;
   description: string;
   craftDetails: string[];

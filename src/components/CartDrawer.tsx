@@ -5,15 +5,13 @@ import {
   Plus, 
   Minus, 
   ShoppingBag, 
-  Scissors, 
   ArrowRight, 
   ShieldCheck, 
   MessageCircle,
   Tag
 } from 'lucide-react';
 import { CartItem } from '../types';
-import { formatCurrency, generateWhatsAppLink } from '../utils/formatters';
-
+import { formatCurrency, generateWhatsAppLink, STORE_WHATSAPP_NUMBER } from '../utils/formatters';
 interface CartDrawerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -45,7 +43,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const [couponFeedback, setCouponFeedback] = useState<string | null>(null);
 
   const subtotal = items.reduce((acc, item) => acc + item.itemTotal, 0);
-  const freeShippingThreshold = 15000;
+  const freeShippingThreshold = 2000;
   const progressToFreeShipping = Math.min(100, (subtotal / freeShippingThreshold) * 100);
   const remainingForFreeShipping = Math.max(0, freeShippingThreshold - subtotal);
   const shippingFee = subtotal >= freeShippingThreshold || items.length === 0 ? 0 : 450;
@@ -63,14 +61,12 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     const itemsList = items
       .map(
         (i, idx) =>
-          `${idx + 1}. *${i.product.name}* (Size: ${i.selectedSize}, Qty: ${i.quantity}) - ₹${i.itemTotal.toLocaleString('en-IN')}${
-            i.isCustomized ? `\n   ↳ Customization: ${i.customization?.blouseStyle || 'Custom fit'} (Bust ${i.customization?.customMeasurements?.bust || '-'})` : ''
-          }`
+          `${idx + 1}. *${i.product.name}* (Size: ${i.selectedSize}, Qty: ${i.quantity}) - ₹${i.itemTotal.toLocaleString('en-IN')}`
       )
       .join('\n');
 
-    const msg = `Hello BhuviSri Enterprises Atelier! ✨\nI would like to place an order for the following items in my bag:\n\n${itemsList}\n\n*Subtotal:* ₹${subtotal.toLocaleString('en-IN')}\n*Estimated Total:* ₹${total.toLocaleString('en-IN')}\n\nPlease guide me through payment confirmation and tailoring notes.`;
-    const link = generateWhatsAppLink('8008889317', msg);
+    const msg = `Hello BhuviSri Enterprises Atelier! ✨\nI would like to place an order for the following items in my bag:\n\n${itemsList}\n\n*Subtotal:* ₹${subtotal.toLocaleString('en-IN')}\n*Estimated Total:* ₹${total.toLocaleString('en-IN')}\n\nPlease guide me through payment confirmation.`;
+    const link = generateWhatsAppLink(STORE_WHATSAPP_NUMBER, msg);
     window.open(link, '_blank');
   };
 
@@ -159,23 +155,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                       Size: <strong className="text-[#2A2A2A]">{item.selectedSize}</strong>
                     </p>
 
-                    {/* Customization Details Pill */}
-                    {item.isCustomized && item.customization && (
-                      <div className="mt-1.5 p-2 bg-[#F5F2ED] border border-[#DCD7D0] text-[10px] space-y-0.5">
-                        <div className="flex items-center gap-1 text-[#A68A64] font-bold uppercase tracking-wider">
-                          <Scissors size={10} />
-                          <span>Bespoke Fit (+₹{item.customizationFee})</span>
-                        </div>
-                        {item.customization.blouseStyle && (
-                          <p className="text-[#6B655E]">Style: {item.customization.blouseStyle}</p>
-                        )}
-                        {item.customization.customMeasurements && (
-                          <p className="text-[#6B655E]">
-                            Bust: {item.customization.customMeasurements.bust}" • Waist: {item.customization.customMeasurements.waist}"
-                          </p>
-                        )}
-                      </div>
-                    )}
                   </div>
 
                   {/* Quantity & Price Row */}

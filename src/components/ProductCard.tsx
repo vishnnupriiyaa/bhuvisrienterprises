@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Heart, Eye, ShoppingBag, MessageCircle, Scissors, Check } from 'lucide-react';
+import { Heart, Eye, ShoppingBag, MessageCircle, Check } from 'lucide-react';
 import { Product } from '../types';
-import { formatCurrency, generateWhatsAppLink, getProductWhatsAppText } from '../utils/formatters';
+import { formatCurrency, generateWhatsAppLink, getProductWhatsAppText, STORE_WHATSAPP_NUMBER } from '../utils/formatters';
 
 interface ProductCardProps {
   product: Product;
@@ -9,7 +9,7 @@ interface ProductCardProps {
   isWishlisted: boolean;
   onToggleWishlist: (product: Product) => void;
   onQuickView: (product: Product) => void;
-  onAddToCart: (product: Product) => void;
+  onAddToCart: (product: Product, selectedColor?: string) => void;
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({
@@ -24,9 +24,22 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
 
+  const colorVariants = product.colorVariants && product.colorVariants.length > 0
+    ? product.colorVariants
+    : [{ id: product.id, name: product.color, hex: product.colorHex, images: product.images }];
+  const [activeVariantId, setActiveVariantId] = useState(colorVariants[0].id);
+  const activeVariant = colorVariants.find(v => v.id === activeVariantId) ?? colorVariants[0];
+  const displayImages = activeVariant.images.length > 0 ? activeVariant.images : product.images;
+
+  const handleSwatchSelect = (e: React.MouseEvent, variantId: string) => {
+    e.stopPropagation();
+    setActiveVariantId(variantId);
+    setCurrentImgIndex(0);
+  };
+
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onAddToCart(product);
+    onAddToCart(product, activeVariant.name);
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 1500);
   };
@@ -34,7 +47,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const handleWhatsAppInquiry = (e: React.MouseEvent) => {
     e.stopPropagation();
     const msg = getProductWhatsAppText(product.name, product.sku, product.price);
-    const link = generateWhatsAppLink('8008889317', msg);
+    const link = generateWhatsAppLink(STORE_WHATSAPP_NUMBER, msg);
     window.open(link, '_blank');
   };
 
@@ -48,7 +61,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       className="group relative bg-[#F5F2ED] border border-[#DCD7D0] overflow-hidden flex flex-col hover:bg-white hover:border-[#2A2A2A] transition-all duration-300"
       onMouseEnter={() => {
         setIsHovered(true);
-        if (product.images.length > 1) setCurrentImgIndex(1);
+        if (displayImages.length > 1) setCurrentImgIndex(1);
       }}
       onMouseLeave={() => {
         setIsHovered(false);
@@ -61,7 +74,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         onClick={() => onQuickView(product)}
       >
         <img
-          src={product.images[currentImgIndex] || product.images[0]}
+          src={displayImages[currentImgIndex] || displayImages[0]}
           alt={product.name}
           className="w-full h-full object-cover object-top transition-transform duration-700 ease-out group-hover:scale-105"
           loading="lazy"
@@ -77,12 +90,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           {product.isNewArrival && (
             <span className="px-2 py-0.5 bg-[#EAE5DF] text-[#2A2A2A] border border-[#DCD7D0]">
               New Arrival
-            </span>
-          )}
-          {product.isCustomizable && (
-            <span className="px-2 py-0.5 bg-white/90 text-[#A68A64] border border-[#DCD7D0] flex items-center gap-1">
-              <Scissors size={9} />
-              <span>Bespoke</span>
             </span>
           )}
         </div>
@@ -165,6 +172,24 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <p className="text-xs text-[#6B655E] line-clamp-1 font-light mt-0.5">
             {product.tagline}
           </p>
+
+          {/* Colour Variant Swatches */}
+          {colorVariants.length > 1 && (
+            <div className="flex items-center gap-1.5 mt-2">
+              {colorVariants.map((variant) => (
+                <button
+                  key={variant.id}
+                  type="button"
+                  onClick={(e) => handleSwatchSelect(e, variant.id)}
+                  title={variant.name}
+                  className={`w-4 h-4 rounded-full border transition-all cursor-pointer ${
+                    activeVariantId === variant.id ? 'ring-2 ring-offset-1 ring-[#2A2A2A] border-[#2A2A2A]' : 'border-[#DCD7D0]'
+                  }`}
+                  style={{ backgroundColor: variant.hex }}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Pricing and Action Footer */}
@@ -181,7 +206,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               )}
             </div>
             <p className="text-[10px] text-[#A68A64] font-medium uppercase tracking-wider">
-              {product.isCustomizable ? 'Bespoke Tailoring' : 'Ready to Dispatch'}
+              Ready to Dispatch
             </p>
           </div>
 
@@ -194,7 +219,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 ? 'bg-[#2A2A2A] text-white border-[#2A2A2A]'
                 : 'bg-[#EAE5DF] hover:bg-[#2A2A2A] text-[#2A2A2A] hover:text-white border-[#DCD7D0]'
             }`}
-            title="Add to Bag"
+            title={`Add ${activeVariant.name} to Bag`}
           >
             {justAdded ? (
               <>

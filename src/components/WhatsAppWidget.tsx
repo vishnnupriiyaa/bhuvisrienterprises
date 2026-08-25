@@ -1,9 +1,10 @@
 import React from 'react';
 import { MessageCircle } from 'lucide-react';
+import { generateWhatsAppLink } from '../utils/formatters';
 
 export const WhatsAppWidget: React.FC = () => {
   const openWhatsApp = () => {
-    window.open('https://wa.me/ +91 8008889317', '_blank', 'noopener,noreferrer');
+    window.open(generateWhatsAppLink(undefined, 'Namaste BhuviSri Enterprises! I would like styling assistance.'), '_blank', 'noopener,noreferrer');
   };
 
   return (

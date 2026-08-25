@@ -12,7 +12,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { UserProfile, Order, Product } from '../types';
-import { formatCurrency, generateWhatsAppLink, getOrderWhatsAppText } from '../utils/formatters';
+import { formatCurrency, generateWhatsAppLink, getOrderWhatsAppText, STORE_WHATSAPP_NUMBER } from '../utils/formatters';
 import { supabase } from '../lib/supabase';
 
 interface UserAccountModalProps {
@@ -44,9 +44,9 @@ export const UserAccountModal: React.FC<UserAccountModalProps> = ({
   
   // Login / Register Form State
   const [isRegisterMode, setIsRegisterMode] = useState(false);
-  const [loginEmail, setLoginEmail] = useState('priya@example.com');
-  const [loginName, setLoginName] = useState('Priya Sharma');
-  const [loginPhone, setLoginPhone] = useState('+91 98765 43210');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginName, setLoginName] = useState('');
+  const [loginPhone, setLoginPhone] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -93,10 +93,10 @@ export const UserAccountModal: React.FC<UserAccountModalProps> = ({
             </div>
             <div>
               <h1 className="font-serif italic text-xl text-[#2A2A2A]">
-                {currentUser ? `Namaste, ${currentUser.name}` : 'Client Sanctuary & Account'}
+                {currentUser ? `Namaste, ${currentUser.name}` : 'Login / Sign Up'}
               </h1>
               <p className="text-[10px] uppercase tracking-wider text-[#6B655E]">
-                {currentUser ? currentUser.email : 'Sign in to access your orders'}
+                {currentUser ? currentUser.email : 'Sign in or create an account to access your orders'}
               </p>
             </div>
           </div>
@@ -267,7 +267,7 @@ export const UserAccountModal: React.FC<UserAccountModalProps> = ({
                             <button
                               onClick={() => {
                                 const msg = getOrderWhatsAppText(ord.orderNumber, ord.customer.name, ord.orderStatus);
-                                const link = generateWhatsAppLink('8008889317', msg);
+                                const link = generateWhatsAppLink(STORE_WHATSAPP_NUMBER, msg);
                                 window.open(link, '_blank');
                               }}
                               className="p-1.5 bg-[#25D366] text-white cursor-pointer"
@@ -286,11 +286,6 @@ export const UserAccountModal: React.FC<UserAccountModalProps> = ({
                               <div className="flex-1">
                                 <h3 className="font-serif italic text-sm text-[#2A2A2A]">{it.product.name}</h3>
                                 <p className="text-[#6B655E]">Size: {it.selectedSize} (Qty: {it.quantity})</p>
-                                {it.isCustomized && (
-                                  <p className="text-[10px] text-[#A68A64] font-bold">
-                                    ↳ Bespoke Fit: {it.customization?.blouseStyle || 'Tailored to measure'}
-                                  </p>
-                                )}
                               </div>
                               <span className="font-bold text-[#2A2A2A]">{formatCurrency(it.itemTotal, currency)}</span>
                             </div>

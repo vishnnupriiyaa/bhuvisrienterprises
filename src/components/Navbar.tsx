@@ -7,7 +7,6 @@ import {
   ShieldCheck, 
   Menu, 
   X, 
-  Truck
 } from 'lucide-react';
 import { ProductCategory, UserProfile } from '../types';
 
@@ -20,7 +19,7 @@ interface NavbarProps {
   onOpenWishlist: () => void;
   onOpenAdmin: () => void;
   onOpenUserAccount: () => void;
-  onOpenOrderLookup: () => void;
+  onOpenAbout: () => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
   currency: 'INR' | 'USD';
@@ -38,7 +37,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenWishlist,
   onOpenAdmin,
   onOpenUserAccount,
-  onOpenOrderLookup,
+  onOpenAbout,
   searchQuery,
   onSearchChange,
   currency,
@@ -55,7 +54,8 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'ethnic', label: 'Ethnic' },
     { id: 'western', label: 'Western' },
     { id: 'accessories', label: 'Accessories' },
-    { id: 'custom', label: 'Customized' },
+    { id: 'gifts', label: 'Gifts & Novelties' },
+    { id: 'accessories', label: 'Accessories' },
   ];
 
   return (
@@ -69,15 +69,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           <div className="flex items-center gap-5 text-[10px] uppercase tracking-[0.2em]">
-            <button 
-              id="header-track-order-btn"
-              onClick={onOpenOrderLookup}
-              className="flex items-center gap-1.5 hover:text-[#A68A64] transition-colors cursor-pointer"
-            >
-              <Truck size={12} />
-              <span>Order Track</span>
-            </button>
-
             <button
               id="currency-toggle-btn"
               onClick={onToggleCurrency}
@@ -127,6 +118,23 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               Western
             </button>
+            <button
+              onClick={() => onSelectCategory('accessories')}
+              className={`hover:opacity-60 transition-opacity cursor-pointer ${
+                activeCategory === 'accessories' ? 'font-bold border-b border-[#2A2A2A] pb-0.5' : ''
+              }`}
+            >
+              Accessories
+            </button>
+            <button
+              onClick={() => onSelectCategory('gifts')}
+              className={`hover:opacity-60 transition-opacity cursor-pointer ${
+                activeCategory === 'gifts' ? 'font-bold border-b border-[#2A2A2A] pb-0.5' : ''
+              }`}
+            >
+              Gifts
+            </button>
+            <button onClick={onOpenAbout} className="hover:opacity-60 transition-opacity cursor-pointer">About Us</button>
           </div>
 
           {/* Mobile menu trigger */}
@@ -265,14 +273,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             <div className="pt-2 flex flex-col space-y-2 border-t border-[#DCD7D0] text-[11px] text-[#2A2A2A]">
-              <button
-                onClick={() => { onOpenOrderLookup(); setMobileMenuOpen(false); }}
-                className="flex items-center gap-2 py-2 text-left hover:text-[#A68A64]"
-              >
-                <Truck size={14} />
-                <span>Track Order</span>
-              </button>
-
+              <button onClick={() => { onOpenAbout(); setMobileMenuOpen(false); }} className="flex items-center gap-2 py-2 text-left hover:text-[#A68A64]">About Us</button>
               <button
                 onClick={() => { onOpenAdmin(); setMobileMenuOpen(false); }}
                 className="flex items-center gap-2 py-2 text-left text-[#A68A64] font-semibold"

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { HeroBanner } from './components/HeroBanner';
+import { AboutUs } from './components/AboutUs';
 import { CategoryNav } from './components/CategoryNav';
 import { ProductCard } from './components/ProductCard';
 import { ProductDetailsModal } from './components/ProductDetailsModal';
@@ -8,7 +9,6 @@ import { CartDrawer } from './components/CartDrawer';
 import { CheckoutModal } from './components/CheckoutModal';
 import { AdminPortal } from './components/AdminPortal';
 import { UserAccountModal } from './components/UserAccountModal';
-import { OrderTrackLookup } from './components/OrderTrackLookup';
 import { WhatsAppWidget } from './components/WhatsAppWidget';
 import { Footer } from './components/Footer';
 import { supabase } from './lib/supabase';
@@ -39,6 +39,7 @@ const mapProductRow = (item: any): Product => ({
   fabric: item.fabric ?? '',
   color: item.color ?? '',
   colorHex: item.color_hex ?? '#000000',
+  colorVariants: item.color_variants ?? undefined,
   occasion: item.occasion ?? '',
   description: item.description ?? '',
   craftDetails: item.craft_details ?? [],
@@ -254,8 +255,17 @@ export default function App() {
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>('All Items');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('featured');
-  const [onlyCustomizable, setOnlyCustomizable] = useState(false);
   const [fabricFilter, setFabricFilter] = useState('All Fabrics');
+  const [colorFilter, setColorFilter] = useState('All Colors');
+  const [sizeFilters, setSizeFilters] = useState<string[]>([]);
+  const [pricePreset, setPricePreset] = useState('All Prices');
+  const [maxPriceFilter, setMaxPriceFilter] = useState(100000);
+  const [brandFilter, setBrandFilter] = useState('All Brands');
+  const [fitFilter, setFitFilter] = useState('All Fits');
+  const [materialFilter, setMaterialFilter] = useState('All Materials');
+  const [occasionFilter, setOccasionFilter] = useState('All Occasions');
+  const [offerFilter, setOfferFilter] = useState('All Offers');
+  const [availabilityFilter, setAvailabilityFilter] = useState('All Availability');
 
   // Coupons
   const [couponCode, setCouponCode] = useState('');
@@ -268,7 +278,7 @@ export default function App() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isAdminPortalOpen, setIsAdminPortalOpen] = useState(false);
   const [isUserAccountOpen, setIsUserAccountOpen] = useState(false);
-  const [isOrderLookupOpen, setIsOrderLookupOpen] = useState(false);
+  const [activePage, setActivePage] = useState<'home' | 'about'>('home');
 
   // Wishlist handler
   const handleToggleWishlist = async (prod: Product) => {
@@ -288,8 +298,8 @@ export default function App() {
   };
 
   // Add to Bag Handlers
-  const handleAddToCartSimple = (prod: Product) => {
-    handleAddToCartDetailed(prod, prod.availableSizes[0] || 'Free Size', false);
+  const handleAddToCartSimple = (prod: Product, selectedColor?: string) => {
+    handleAddToCartDetailed(prod, prod.availableSizes[0] || 'Free Size', false, undefined, 0, selectedColor);
   };
 
   const handleAddToCartDetailed = (
@@ -297,10 +307,12 @@ export default function App() {
     size: string,
     isCustomized: boolean,
     customization?: CustomizationDetails,
-    customizationFee: number = 0
+    customizationFee: number = 0,
+    selectedColor?: string
   ) => {
+    const chosenColor = selectedColor || prod.color;
     const itemTotal = (prod.price + customizationFee);
-    const cartItemId = `${prod.id}-${size}-${isCustomized ? JSON.stringify(customization) : 'std'}`;
+    const cartItemId = `${prod.id}-${chosenColor}-${size}-${isCustomized ? JSON.stringify(customization) : 'std'}`;
 
     setCart((prev) => {
       const existingIdx = prev.findIndex((item) => item.id === cartItemId);
@@ -319,7 +331,7 @@ export default function App() {
           productId: prod.id,
           product: prod,
           selectedSize: size,
-          selectedColor: prod.color,
+          selectedColor: chosenColor,
           quantity: 1,
           isCustomized,
           customization,
@@ -368,11 +380,6 @@ export default function App() {
       setDiscountAmount(disc);
       setCouponCode(code);
       return { success: true, message: `✨ Coupon FIRSTFASHION applied! (-₹1,500 off)` };
-    } else if (code === 'BESPOKE500') {
-      const disc = 500;
-      setDiscountAmount(disc);
-      setCouponCode(code);
-      return { success: true, message: `✨ Coupon BESPOKE500 applied! (-₹500 off)` };
     }
     return { success: false, message: 'Invalid coupon code. Try AURA10 or FIRSTFASHION.' };
   };
@@ -458,6 +465,7 @@ export default function App() {
     fabric: product.fabric,
     color: product.color,
     color_hex: product.colorHex,
+    color_variants: product.colorVariants ?? [],
     occasion: product.occasion,
     craft_details: product.craftDetails,
     care_instructions: product.careInstructions,
@@ -623,15 +631,11 @@ export default function App() {
     // Deactivated products stay visible to admins in Supabase RLS, so hide them from the storefront view explicitly.
     if (p.isActive === false) return false;
     // Category
-    if (activeCategory !== 'all' && activeCategory !== 'custom_studio' && p.category !== activeCategory) {
+    if (activeCategory !== 'all' && p.category !== activeCategory) {
       return false;
     }
     // Subcategory
     if (selectedSubcategory && !selectedSubcategory.startsWith('All') && p.subcategory !== selectedSubcategory) {
-      return false;
-    }
-    // Customizable only
-    if (onlyCustomizable && !p.isCustomizable) {
       return false;
     }
     // Fabric
@@ -640,6 +644,34 @@ export default function App() {
         return false;
       }
     }
+    if (colorFilter && colorFilter !== 'All Colors' && p.color.toLowerCase() !== colorFilter.toLowerCase()) {
+      return false;
+    }
+    if (sizeFilters.length > 0 && !sizeFilters.some((size) => p.availableSizes.some((availableSize) => availableSize.toLowerCase().startsWith(size.toLowerCase())))) return false;
+    if (pricePreset !== 'All Prices') {
+      const inPreset = pricePreset === 'under_499' ? p.price < 499
+        : pricePreset === '500_999' ? p.price >= 500 && p.price <= 999
+        : pricePreset === '1000_1999' ? p.price >= 1000 && p.price <= 1999
+        : pricePreset === '2000_3999' ? p.price >= 2000 && p.price <= 3999
+        : p.price >= 4000;
+      if (!inPreset) return false;
+    }
+    if (p.price > maxPriceFilter) return false;
+    if (brandFilter !== 'All Brands' && brandFilter !== 'BhuviSri Enterprises') return false;
+    if (fitFilter !== 'All Fits') {
+      const inferredFit = p.category === 'accessories' || p.category === 'gifts' ? 'Relaxed' : 'Regular';
+      if (inferredFit !== fitFilter) return false;
+    }
+    if (materialFilter !== 'All Materials' && !p.fabric.toLowerCase().includes(materialFilter.toLowerCase())) return false;
+    if (occasionFilter !== 'All Occasions' && !p.occasion.toLowerCase().includes(occasionFilter.toLowerCase())) return false;
+    if (offerFilter === 'On Sale' && !p.originalPrice) return false;
+    if (offerFilter === '20%+ Off' && (!p.originalPrice || ((p.originalPrice - p.price) / p.originalPrice) < 0.2)) return false;
+    if (offerFilter === '40%+ Off' && (!p.originalPrice || ((p.originalPrice - p.price) / p.originalPrice) < 0.4)) return false;
+    if (offerFilter === '50%+ Off' && (!p.originalPrice || ((p.originalPrice - p.price) / p.originalPrice) < 0.5)) return false;
+    if (offerFilter === 'Clearance' && !p.isNewArrival && !p.originalPrice) return false;
+    if (availabilityFilter === 'In stock' && !p.inStock) return false;
+    if (availabilityFilter === 'New arrivals' && !p.isNewArrival) return false;
+    if (availabilityFilter === 'Pre-order' && p.inStock) return false;
     // Search
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -658,8 +690,12 @@ export default function App() {
     if (sortBy === 'price_high') return b.price - a.price;
     if (sortBy === 'rating') return b.rating - a.rating;
     if (sortBy === 'newest') return (b.isNewArrival ? 1 : 0) - (a.isNewArrival ? 1 : 0);
+    if (sortBy === 'best_selling') return (b.isBestSeller ? 1 : 0) - (a.isBestSeller ? 1 : 0);
+    if (sortBy === 'discount') return ((b.originalPrice ? (b.originalPrice - b.price) / b.originalPrice : 0) - (a.originalPrice ? (a.originalPrice - a.price) / a.originalPrice : 0));
     return 0; // featured
   });
+  const colorOptions = ['All Colors', ...Array.from(new Set(products.map((product) => product.color.trim()).filter(Boolean))).sort()];
+  const maxCatalogPrice = Math.max(4000, ...products.map((product) => product.price));
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FAF7F2] text-[#2D2824]">
@@ -668,6 +704,7 @@ export default function App() {
       <Navbar
         activeCategory={activeCategory}
         onSelectCategory={(cat) => {
+          setActivePage('home');
           setActiveCategory(cat);
           setSelectedSubcategory('All Items');
         }}
@@ -677,7 +714,7 @@ export default function App() {
         onOpenWishlist={() => setIsUserAccountOpen(true)}
         onOpenAdmin={() => setIsAdminPortalOpen(true)}
         onOpenUserAccount={() => setIsUserAccountOpen(true)}
-        onOpenOrderLookup={() => setIsOrderLookupOpen(true)}
+        onOpenAbout={() => setActivePage('about')}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         currency={currency}
@@ -689,9 +726,19 @@ export default function App() {
       {/* Main Page Body */}
       <main className="flex-1">
         
+        {activePage === 'about' ? (
+          <AboutUs
+            onBrowseCollection={() => {
+              setActivePage('home');
+              setTimeout(() => document.getElementById('catalog-products-grid')?.scrollIntoView({ behavior: 'smooth' }), 0);
+            }}
+            onBackHome={() => setActivePage('home')}
+          />
+        ) : <>
         {/* Editorial Hero Banner */}
         <HeroBanner
           onSelectCategory={(cat) => {
+            setActivePage('home');
             setActiveCategory(cat);
             setSelectedSubcategory('All Items');
             const el = document.getElementById('catalog-products-grid');
@@ -703,6 +750,7 @@ export default function App() {
         <CategoryNav
           activeCategory={activeCategory}
           onSelectCategory={(cat) => {
+            setActivePage('home');
             setActiveCategory(cat);
             setSelectedSubcategory('All Items');
           }}
@@ -710,10 +758,30 @@ export default function App() {
           onSelectSubcategory={setSelectedSubcategory}
           sortBy={sortBy}
           onSortChange={setSortBy}
-          onlyCustomizable={onlyCustomizable}
-          onToggleOnlyCustomizable={() => setOnlyCustomizable(!onlyCustomizable)}
           fabricFilter={fabricFilter}
           onFabricFilterChange={setFabricFilter}
+          colorFilter={colorFilter}
+          onColorFilterChange={setColorFilter}
+          colorOptions={colorOptions}
+          sizeFilters={sizeFilters}
+          onSizeFiltersChange={setSizeFilters}
+          pricePreset={pricePreset}
+          onPricePresetChange={setPricePreset}
+          maxPriceFilter={maxPriceFilter}
+          maxCatalogPrice={maxCatalogPrice}
+          onMaxPriceChange={setMaxPriceFilter}
+          brandFilter={brandFilter}
+          onBrandFilterChange={setBrandFilter}
+          fitFilter={fitFilter}
+          onFitFilterChange={setFitFilter}
+          materialFilter={materialFilter}
+          onMaterialFilterChange={setMaterialFilter}
+          occasionFilter={occasionFilter}
+          onOccasionFilterChange={setOccasionFilter}
+          offerFilter={offerFilter}
+          onOfferFilterChange={setOfferFilter}
+          availabilityFilter={availabilityFilter}
+          onAvailabilityFilterChange={setAvailabilityFilter}
           productCount={filteredProducts.length}
         />
 
@@ -746,8 +814,17 @@ export default function App() {
                 onClick={() => {
                   setActiveCategory('all');
                   setSelectedSubcategory('All Items');
-                  setOnlyCustomizable(false);
                   setFabricFilter('All Fabrics');
+                  setColorFilter('All Colors');
+                  setSizeFilters([]);
+                  setPricePreset('All Prices');
+                  setMaxPriceFilter(100000);
+                  setBrandFilter('All Brands');
+                  setFitFilter('All Fits');
+                  setMaterialFilter('All Materials');
+                  setOccasionFilter('All Occasions');
+                  setOfferFilter('All Offers');
+                  setAvailabilityFilter('All Availability');
                   setSearchQuery('');
                 }}
                 className="px-6 py-2.5 bg-[#2A2A2A] text-white text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-[#404040] cursor-pointer"
@@ -774,12 +851,12 @@ export default function App() {
             </div>
           )}
         </section>
+        </>}
 
       </main>
 
       {/* Footer */}
       <Footer
-        onOpenOrderLookup={() => setIsOrderLookupOpen(true)}
         onOpenAdmin={() => setIsAdminPortalOpen(true)}
       />
 
@@ -788,7 +865,7 @@ export default function App() {
 
       {/* Modals & Slide-Overs */}
 
-      {/* 1. Product Details & Custom Tailoring Modal */}
+      {/* 1. Product Details Modal */}
       <ProductDetailsModal
         product={selectedProduct}
         isOpen={isProductModalOpen}
@@ -862,14 +939,6 @@ export default function App() {
           setSelectedProduct(p);
           setIsProductModalOpen(true);
         }}
-      />
-
-      {/* 6. Public Order Tracking Lookup Modal */}
-      <OrderTrackLookup
-        isOpen={isOrderLookupOpen}
-        onClose={() => setIsOrderLookupOpen(false)}
-        orders={orders}
-        currency={currency}
       />
 
     </div>

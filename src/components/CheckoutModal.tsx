@@ -4,18 +4,14 @@ import {
   X, 
   ShieldCheck, 
   CreditCard, 
-  Smartphone, 
-  Building, 
   Truck, 
   Check, 
   Lock, 
-  Eye,
-  EyeOff,
   MessageCircle, 
   ArrowRight
 } from 'lucide-react';
 import { CartItem, CustomerDetails, Order } from '../types';
-import { formatCurrency, generateWhatsAppLink, getOrderWhatsAppText } from '../utils/formatters';
+import { formatCurrency, generateWhatsAppLink, getOrderWhatsAppText, STORE_WHATSAPP_NUMBER } from '../utils/formatters';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -40,73 +36,150 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  const [step, setStep] = useState<'details' | 'payment' | 'otp_verify' | 'success'>('details');
+  const [step, setStep] = useState<'details' | 'payment' | 'success'>('details');
 
   // Customer Form State
   const [customer, setCustomer] = useState<CustomerDetails>({
-    name: initialCustomer?.name || 'Priya Sharma',
-    email: initialCustomer?.email || 'priya.sharma@example.com',
-    phone: initialCustomer?.phone || '+91 98765 43210',
-    address: initialCustomer?.address || '402, Magnolia Residency, Indiranagar 100ft Road',
-    city: initialCustomer?.city || 'Bengaluru',
-    state: initialCustomer?.state || 'Karnataka',
-    pincode: initialCustomer?.pincode || '560038',
+    name: initialCustomer?.name || '',
+    email: initialCustomer?.email || '',
+    phone: initialCustomer?.phone || '',
+    address: initialCustomer?.address || '',
+    city: initialCustomer?.city || '',
+    state: initialCustomer?.state || '',
+    pincode: initialCustomer?.pincode || '',
     country: 'India',
   });
 
   const [whatsappUpdates, setWhatsappUpdates] = useState(true);
 
   // Payment Method State
-  const [paymentMethod, setPaymentMethod] = useState<'upi' | 'card' | 'netbanking' | 'cod'>('upi');
-  const [selectedUpiApp, setSelectedUpiApp] = useState('Google Pay');
-  const [upiId, setUpiId] = useState('');
-  
-  // Card state
-  const [cardNumber, setCardNumber] = useState('4532 •••• •••• 8821');
-  const [cardExpiry, setCardExpiry] = useState('08/29');
-  const [cardCvv, setCardCvv] = useState('•••');
-  const [isCvvVisible, setIsCvvVisible] = useState(false);
-  const [cardHolder, setCardHolder] = useState('PRIYA SHARMA');
-
-  // Net banking state
-  const [selectedBank, setSelectedBank] = useState('HDFC Bank');
-
-  // OTP Simulation State
-  const [inputOtp, setInputOtp] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'cod'>('razorpay');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [addressError, setAddressError] = useState<string | null>(null);
 
   // Completed Order State
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
 
   const subtotal = items.reduce((acc, i) => acc + i.itemTotal, 0);
-  const freeShippingThreshold = 15000;
+  const freeShippingThreshold = 2000;
   const shippingFee = subtotal >= freeShippingThreshold || items.length === 0 ? 0 : 450;
   const totalAmount = Math.max(0, subtotal - discount + shippingFee);
 
-  const handleDetailsSubmit = (e: React.FormEvent) => {
+  const handleDetailsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStep('payment');
-  };
 
-  const handleInitiatePayment = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (paymentMethod === 'card' || paymentMethod === 'upi') {
-      setStep('otp_verify');
-    } else {
-      finalizeOrder(paymentMethod === 'cod' ? 'Pending' : 'Paid');
+    setAddressError(null);
+    const normalizedPincode = customer.pincode.replace(/\D/g, '');
+    if (customer.address.trim().length < 10) {
+      setAddressError('Please enter a complete street address with house or building details.');
+      return;
+    }
+    if (normalizedPincode.length !== 6) {
+      setAddressError('Please enter a valid 6-digit Indian pincode.');
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const response = await fetch(`https://api.postalpincode.in/pincode/${normalizedPincode}`);
+      if (!response.ok) throw new Error('Postal verification is unavailable.');
+      const [postalResult] = await response.json();
+      const postOffice = postalResult?.PostOffice?.[0];
+      if (postalResult?.Status !== 'Success' || !postOffice) {
+        setAddressError('That pincode could not be verified. Please check your address details.');
+        return;
+      }
+
+      const enteredState = customer.state.trim().toLowerCase();
+      const enteredCity = customer.city.trim().toLowerCase();
+      const stateMatches = postOffice.State.toLowerCase() === enteredState;
+      const cityMatches = [postOffice.District, postOffice.Block, postOffice.Name]
+        .filter(Boolean)
+        .some((value: string) => value.toLowerCase() === enteredCity);
+      if (!stateMatches || !cityMatches) {
+        setAddressError(`Pincode ${normalizedPincode} belongs to ${postOffice.District}, ${postOffice.State}. Please correct the city and state.`);
+        return;
+      }
+
+      setCustomer((current) => ({ ...current, pincode: normalizedPincode }));
+      setStep('payment');
+    } catch (error) {
+      setAddressError(error instanceof Error ? error.message : 'Address verification failed. Please try again.');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const handleVerifyOtp = (e: React.FormEvent) => {
+  const handleInitiatePayment = async (e: React.FormEvent) => {
     e.preventDefault();
+    setPaymentError(null);
+
+    if (paymentMethod === 'cod') {
+      await finalizeOrder('Pending', 'cod');
+      return;
+    }
+
     setIsProcessing(true);
-    setTimeout(() => {
+    try {
+      const response = await fetch('/api/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: Math.round(totalAmount * 100),
+          currency: 'INR',
+          receipt: `order_${Date.now()}`,
+        }),
+      });
+      const order = await response.json();
+      if (!response.ok) throw new Error(order.error || 'Unable to start payment.');
+
+      const razorpay = new window.Razorpay({
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        amount: order.amount,
+        currency: order.currency,
+        name: 'BhuviSri Enterprises',
+        description: `Order for ${items.length} item(s)`,
+        order_id: order.order_id,
+        prefill: { name: customer.name, email: customer.email, contact: customer.phone },
+        theme: { color: '#2A2A2A' },
+        handler: async (payment) => {
+          try {
+            const verificationResponse = await fetch('/api/verify-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payment),
+            });
+            const verification = await verificationResponse.json();
+            if (!verificationResponse.ok || !verification.verified) {
+              throw new Error(verification.error || 'Payment verification failed.');
+            }
+            await finalizeOrder('Paid', 'razorpay');
+          } catch (error) {
+            setIsProcessing(false);
+            setPaymentError(error instanceof Error ? error.message : 'Payment verification failed.');
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setIsProcessing(false);
+            setPaymentError('Payment was cancelled before completion.');
+          },
+        },
+      });
+
+      razorpay.on('payment.failed', (failure) => {
+        setIsProcessing(false);
+        setPaymentError(failure.error?.description || 'Payment failed. Please try again.');
+      });
+      razorpay.open();
+    } catch (error) {
       setIsProcessing(false);
-      finalizeOrder('Paid');
-    }, 1000);
+      setPaymentError(error instanceof Error ? error.message : 'Unable to start payment.');
+    }
   };
 
-  const finalizeOrder = async (paymentStatus: 'Paid' | 'Pending') => {
+  const finalizeOrder = async (paymentStatus: 'Paid' | 'Pending', finalizedPaymentMethod = paymentMethod) => {
     const orderNum = `AL-${Date.now()}`;
     const now = new Date();
     const estDate = new Date();
@@ -123,7 +196,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       couponCode: discount > 0 ? couponCode : undefined,
       shippingFee,
       totalAmount,
-      paymentMethod,
+      paymentMethod: finalizedPaymentMethod,
       paymentStatus,
       orderStatus: 'Order Placed',
       trackingNumber: `EXP-AURA-${Math.floor(100000 + Math.random() * 900000)}`,
@@ -134,13 +207,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         {
           status: 'Order Placed',
           timestamp: 'Just now',
-          description: `Order ${orderNum} confirmed with ${paymentMethod.toUpperCase()} (${paymentStatus}).`,
+          description: `Order ${orderNum} confirmed with ${finalizedPaymentMethod.toUpperCase()} (${paymentStatus}).`,
           completed: true,
         },
         {
           status: 'Crafting & Stitching',
           timestamp: 'Upcoming (1-2 days)',
-          description: 'Saree drape and bespoke blouse tailoring in workshop.',
+          description: 'Your order is being prepared in our workshop.',
           completed: false,
         },
         {
@@ -188,7 +261,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const handleShareWhatsAppOrder = () => {
     if (!completedOrder) return;
     const msg = getOrderWhatsAppText(completedOrder.orderNumber, completedOrder.customer.name, 'Confirmed & In Production');
-    const link = generateWhatsAppLink('8008889317', msg);
+    const link = generateWhatsAppLink(STORE_WHATSAPP_NUMBER, msg);
     window.open(link, '_blank');
   };
 
@@ -204,7 +277,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           <div className="flex items-center gap-2">
             <ShieldCheck size={18} className="text-[#2A2A2A]" />
             <h1 className="font-serif italic text-xl text-[#2A2A2A]">
-              {step === 'success' ? 'Order Confirmed' : '256-Bit Encrypted Secure Checkout'}
+              {step === 'success' ? 'Order Confirmed' : 'Continue with Payment'}
             </h1>
           </div>
 
@@ -322,6 +395,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </label>
               </div>
 
+              {addressError && (
+                <div className="p-3 border border-[#A68A64] bg-[#F5F2ED] text-xs text-[#2A2A2A]" role="alert">
+                  {addressError}
+                </div>
+              )}
+
               {/* Order Summary Mini Box */}
               <div className="p-4 bg-[#EAE5DF] border border-[#DCD7D0] text-xs flex justify-between items-center">
                 <div>
@@ -334,9 +413,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <div className="flex justify-end pt-2">
                 <button
                   type="submit"
+                  disabled={isProcessing}
                   className="px-8 py-3 bg-[#2A2A2A] hover:bg-[#404040] text-white text-[11px] font-bold uppercase tracking-[0.2em] flex items-center gap-2 cursor-pointer"
                 >
-                  <span>Proceed to Payment</span>
+                  <span>{isProcessing ? 'Verifying Address...' : 'Proceed to Payment'}</span>
                   <ArrowRight size={13} />
                 </button>
               </div>
@@ -353,9 +433,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-5">
                   {[
-                    { id: 'upi', label: 'UPI / QR', icon: Smartphone },
-                    { id: 'card', label: 'Card', icon: CreditCard },
-                    { id: 'netbanking', label: 'Net Banking', icon: Building },
+                    { id: 'razorpay', label: 'Razorpay / UPI / Card', icon: CreditCard },
                     { id: 'cod', label: 'COD', icon: Truck },
                   ].map((m) => {
                     const Icon = m.icon;
@@ -377,107 +455,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   })}
                 </div>
 
-                {/* UPI Configuration */}
-                {paymentMethod === 'upi' && (
-                  <div className="bg-[#EAE5DF] p-4 border border-[#DCD7D0] space-y-3 text-xs">
-                    <p className="font-bold uppercase tracking-wider text-[10px] text-[#2A2A2A]">Instant UPI Payment</p>
-                    <div className="flex flex-wrap gap-2">
-                      {['Google Pay', 'PhonePe', 'Paytm', 'BHIM UPI'].map((app) => (
-                        <button
-                          type="button"
-                          key={app}
-                          onClick={() => setSelectedUpiApp(app)}
-                          className={`px-3 py-1 border text-xs ${
-                            selectedUpiApp === app
-                              ? 'bg-[#2A2A2A] text-white border-[#2A2A2A]'
-                              : 'bg-[#F5F2ED] border-[#DCD7D0] text-[#2A2A2A]'
-                          }`}
-                        >
-                          {app}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] uppercase tracking-wider text-[#6B655E] mb-1">Enter UPI ID / VPA</label>
-                      <input
-                        type="text"
-                        placeholder="yourname@okaxis"
-                        value={upiId}
-                        onChange={(e) => setUpiId(e.target.value)}
-                        className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 text-xs text-[#2A2A2A]"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Card Configuration */}
-                {paymentMethod === 'card' && (
-                  <div className="bg-[#EAE5DF] p-4 border border-[#DCD7D0] space-y-3 text-xs">
-                    <div className="flex items-center justify-between pb-2 border-b border-[#DCD7D0]">
-                      <span className="font-bold uppercase tracking-wider text-[10px] text-[#2A2A2A]">Card Details</span>
-                      <span className="text-[9px] font-mono text-[#6B655E]">VISA • MASTERCARD • AMEX</span>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] uppercase tracking-wider text-[#6B655E] mb-1">Card Number</label>
-                      <input
-                        type="text"
-                        value={cardNumber}
-                        onChange={(e) => setCardNumber(e.target.value)}
-                        className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 text-xs text-[#2A2A2A] font-mono"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[10px] uppercase tracking-wider text-[#6B655E] mb-1">Expiry</label>
-                        <input
-                          type="text"
-                          value={cardExpiry}
-                          onChange={(e) => setCardExpiry(e.target.value)}
-                          className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 text-xs text-[#2A2A2A] font-mono"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] uppercase tracking-wider text-[#6B655E] mb-1">CVV</label>
-                        <div className="relative">
-                          <input
-                            type={isCvvVisible ? 'text' : 'password'}
-                            maxLength={4}
-                            value={cardCvv}
-                            onChange={(e) => setCardCvv(e.target.value)}
-                            className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 pr-10 text-xs text-[#2A2A2A] font-mono"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setIsCvvVisible((visible) => !visible)}
-                            className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-[#6B655E] hover:text-[#2A2A2A] cursor-pointer"
-                            aria-label={isCvvVisible ? 'Hide CVV' : 'Show CVV'}
-                            title={isCvvVisible ? 'Hide CVV' : 'Show CVV'}
-                          >
-                            {isCvvVisible ? <EyeOff size={16} /> : <Eye size={16} />}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Net Banking */}
-                {paymentMethod === 'netbanking' && (
-                  <div className="bg-[#EAE5DF] p-4 border border-[#DCD7D0] text-xs space-y-2">
-                    <label className="block font-bold uppercase tracking-wider text-[10px] text-[#2A2A2A]">Select Bank:</label>
-                    <select
-                      value={selectedBank}
-                      onChange={(e) => setSelectedBank(e.target.value)}
-                      className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 text-xs text-[#2A2A2A]"
-                    >
-                      <option value="HDFC Bank">HDFC Bank</option>
-                      <option value="ICICI Bank">ICICI Bank</option>
-                      <option value="State Bank of India">State Bank of India</option>
-                      <option value="Axis Bank">Axis Bank</option>
-                    </select>
+                {paymentMethod !== 'cod' && (
+                  <div className="p-4 bg-[#EAE5DF] border border-[#DCD7D0] text-xs text-[#2A2A2A] space-y-1">
+                    <p className="font-bold uppercase tracking-wider text-[10px]">Razorpay Secure Checkout</p>
+                    <p className="text-[#6B655E]">UPI, QR scanner, cards, net banking, and wallets will open in Razorpay's secure payment window.</p>
                   </div>
                 )}
 
@@ -486,6 +467,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   <div className="p-4 bg-[#EAE5DF] border border-[#DCD7D0] text-xs text-[#2A2A2A] space-y-1">
                     <p className="font-bold uppercase tracking-wider text-[10px]">Cash on Delivery (COD)</p>
                     <p className="text-[#6B655E]">Pay cash upon delivery to the courier agent after inspecting the package.</p>
+                  </div>
+                )}
+
+                {paymentError && (
+                  <div className="p-3 border border-[#A68A64] bg-[#F5F2ED] text-xs text-[#2A2A2A]" role="alert">
+                    {paymentError}
                   </div>
                 )}
               </div>
@@ -501,65 +488,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
                 <button
                   type="submit"
+                  disabled={isProcessing}
                   className="px-8 py-3.5 bg-[#2A2A2A] hover:bg-[#404040] text-white text-[11px] font-bold uppercase tracking-[0.2em] flex items-center gap-2 cursor-pointer shadow-xs"
                 >
                   <Lock size={13} />
-                  <span>Pay {formatCurrency(totalAmount, currency)}</span>
+                  <span>{isProcessing ? 'Opening Secure Checkout...' : `Pay ${formatCurrency(totalAmount, currency)}`}</span>
                 </button>
               </div>
             </form>
           )}
 
-          {/* STEP 3: OTP Simulation */}
-          {step === 'otp_verify' && (
-            <form onSubmit={handleVerifyOtp} className="max-w-md mx-auto text-center space-y-5 py-4">
-              <div className="w-12 h-12 bg-[#EAE5DF] border border-[#DCD7D0] text-[#2A2A2A] mx-auto flex items-center justify-center">
-                <Lock size={18} />
-              </div>
-
-              <div>
-                <h2 className="font-serif italic text-2xl text-[#2A2A2A]">Bank Security Check</h2>
-                <p className="text-xs text-[#6B655E] mt-1 font-light">
-                  Enter the 4-digit code sent to your registered mobile ending in <strong>4210</strong>.
-                </p>
-                <span className="inline-block mt-2 px-2.5 py-0.5 border border-[#DCD7D0] bg-[#EAE5DF] font-mono text-xs text-[#2A2A2A]">
-                  Demo Code: <strong>7392</strong>
-                </span>
-              </div>
-
-              <div className="max-w-xs mx-auto">
-                <input
-                  type="text"
-                  maxLength={4}
-                  required
-                  placeholder="7392"
-                  value={inputOtp}
-                  onChange={(e) => setInputOtp(e.target.value)}
-                  className="w-full text-center tracking-[0.5em] text-2xl font-bold bg-[#F5F2ED] border border-[#2A2A2A] p-3 text-[#2A2A2A] focus:outline-none"
-                />
-              </div>
-
-              <div className="flex gap-3 justify-center pt-2">
-                <button
-                  type="button"
-                  onClick={() => setStep('payment')}
-                  className="px-4 py-2 border border-[#DCD7D0] text-xs uppercase tracking-wider cursor-pointer"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={isProcessing}
-                  className="px-6 py-2 bg-[#2A2A2A] text-white text-xs font-bold uppercase tracking-[0.2em] cursor-pointer"
-                >
-                  {isProcessing ? 'Verifying...' : 'Authorize'}
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* STEP 4: Success */}
+          {/* STEP 3: Success */}
           {step === 'success' && completedOrder && (
             <div className="space-y-6 text-center">
               <div className="w-14 h-14 bg-[#2A2A2A] text-white mx-auto flex items-center justify-center">
@@ -613,7 +552,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </div>
                   <div>
                     <p className="text-xs font-bold text-[#2A2A2A]">Connect on WhatsApp</p>
-                    <p className="text-[11px] text-[#6B655E]">Receive live tailoring photos and concierge status.</p>
+                    <p className="text-[11px] text-[#6B655E]">Receive live preparation photos and order updates.</p>
                   </div>
                 </div>
 

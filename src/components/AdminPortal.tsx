@@ -23,8 +23,9 @@ import {
   CheckCircle2,
   AlertCircle
 } from 'lucide-react';
-import { Product, Order, OrderStatus, ProductCategory } from '../types';
+import { Product, ProductColorVariant, Order, OrderStatus, ProductCategory } from '../types';
 import { formatCurrency, generateWhatsAppLink, getOrderWhatsAppText } from '../utils/formatters';
+import { detectDominantColor } from '../utils/colorDetection';
 
 interface AdminPortalProps {
   isOpen: boolean;
@@ -79,26 +80,76 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   
   // Multi-Image Upload State
   const [imageUrlInput, setImageUrlInput] = useState('');
-  const [imageGallery, setImageGallery] = useState<string[]>([
-    'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1000&q=85'
-  ]);
+  const [imageGallery, setImageGallery] = useState<string[]>([]);
   const [isDraggingImages, setIsDraggingImages] = useState(false);
   const [uploadStatusMsg, setUploadStatusMsg] = useState<string | null>(null);
+  const [autoDetectColor, setAutoDetectColor] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const initialColorVariant: ProductColorVariant = {
+    id: 'variant-new-1',
+    name: 'Sand Gold',
+    hex: '#D4AF37',
+    images: [],
+  };
+  const [colorVariants, setColorVariants] = useState<ProductColorVariant[]>([initialColorVariant]);
+  const [activeColorVariantId, setActiveColorVariantId] = useState<string | null>(initialColorVariant.id);
 
   const [fabric, setFabric] = useState('Pure Mulberry Handloom Silk');
   const [color, setColor] = useState('Sand Gold');
   const [colorHex, setColorHex] = useState('#D4AF37');
   const [occasion, setOccasion] = useState('Weddings & Festive');
   const [description, setDescription] = useState('');
-  const [craftDetailsInput, setCraftDetailsInput] = useState('Pure certified artisanal handloom weave\nCustom made-to-measure tailoring available');
+  const [craftDetailsInput, setCraftDetailsInput] = useState('Pure certified artisanal handloom weave');
   const [careInstructions, setCareInstructions] = useState('Dry clean only. Store in muslin cloth.');
   const [availableSizes, setAvailableSizes] = useState('Free Size (6.2m with blouse)');
   const [stockCount, setStockCount] = useState(10);
   const [inStock, setInStock] = useState(true);
   const [isBestSeller, setIsBestSeller] = useState(false);
   const [isNewArrival, setIsNewArrival] = useState(false);
-  const [isCustomizable, setIsCustomizable] = useState(true);
+
+  const saveActiveVariantImages = () => {
+    if (!activeColorVariantId) return;
+    setColorVariants(prev => prev.map(variant => (
+      variant.id === activeColorVariantId
+        ? { ...variant, name: color.trim() || variant.name, hex: colorHex.trim() || variant.hex, images: imageGallery }
+        : variant
+    )));
+  };
+
+  const selectColorVariant = (variant: ProductColorVariant) => {
+    saveActiveVariantImages();
+    setActiveColorVariantId(variant.id);
+    setColor(variant.name);
+    setColorHex(variant.hex);
+    setImageGallery([...variant.images]);
+  };
+
+  const addColorVariant = () => {
+    saveActiveVariantImages();
+    const variant: ProductColorVariant = {
+      id: `variant-${Date.now()}`,
+      name: `Colour ${colorVariants.length + 1}`,
+      hex: '#D4AF37',
+      images: [],
+    };
+    setColorVariants(prev => [...prev, variant]);
+    setActiveColorVariantId(variant.id);
+    setColor(variant.name);
+    setColorHex(variant.hex);
+    setImageGallery([]);
+  };
+
+  const removeColorVariant = (variantId: string) => {
+    const remaining = colorVariants.filter(variant => variant.id !== variantId);
+    setColorVariants(remaining);
+    if (activeColorVariantId === variantId) {
+      const next = remaining[0];
+      setActiveColorVariantId(next?.id ?? null);
+      setColor(next?.name ?? '');
+      setColorHex(next?.hex ?? '#000000');
+      setImageGallery(next ? [...next.images] : []);
+    }
+  };
 
   // Order Search & Filter
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('All');
@@ -124,19 +175,28 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
   // Multiple File Processing using real Supabase Storage bucket.
   const processFiles = async (files: FileList | File[]) => {
-    const validImageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+    if (!autoDetectColor && !activeColorVariantId) {
+      setUploadStatusMsg('Select a colour variant before uploading photos.');
+      setTimeout(() => setUploadStatusMsg(null), 3500);
+      return;
+    }
+    const maxImageSize = 5 * 1024 * 1024;
+    const validImageFiles = Array.from(files).filter(
+      file => file.type.startsWith('image/') && file.size <= maxImageSize,
+    );
     if (validImageFiles.length === 0) {
-      setUploadStatusMsg('Please select valid image files (JPEG, PNG, WEBP, GIF).');
+      setUploadStatusMsg('Please select image files no larger than 5 MB each.');
       setTimeout(() => setUploadStatusMsg(null), 3500);
       return;
     }
 
-    setUploadStatusMsg(`Uploading ${validImageFiles.length} photo(s) to Supabase Storage...`);
+    const skippedCount = Array.from(files).length - validImageFiles.length;
+    setUploadStatusMsg(
+      `Uploading ${validImageFiles.length} photo(s)${autoDetectColor ? ' and detecting colours' : ` for ${color}`}${skippedCount ? `; skipped ${skippedCount}` : ''}...`,
+    );
 
     try {
-      const uploadedUrls: string[] = [];
-
-      for (const file of validImageFiles) {
+      const uploaded = await Promise.all(validImageFiles.map(async (file) => {
         const safeName = `${Date.now()}-${Math.random().toString(16).slice(2)}-${file.name.replace(/\s+/g, '-').toLowerCase()}`;
         const { data, error } = await supabase.storage
           .from('product-images')
@@ -151,12 +211,58 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         }
 
         const publicUrl = supabase.storage.from('product-images').getPublicUrl(data.path).data.publicUrl;
-        uploadedUrls.push(publicUrl);
-      }
 
-      setImageGallery(prev => [...prev, ...uploadedUrls]);
-      setUploadStatusMsg(`Successfully uploaded ${uploadedUrls.length} image(s).`);
-      setTimeout(() => setUploadStatusMsg(null), 3500);
+        let detected: { name: string; hex: string } | null = null;
+        if (autoDetectColor) {
+          try {
+            detected = await detectDominantColor(file);
+          } catch (detectionError) {
+            console.warn('Colour auto-detection failed for a photo, keeping it in the active colour group:', detectionError);
+          }
+        }
+        return { url: publicUrl, detected };
+      }));
+
+      if (autoDetectColor) {
+        // Group each uploaded photo into a matching (or newly created) colour variant based on its detected colour.
+        let workingVariants = [...colorVariants];
+        let lastTouchedId = activeColorVariantId;
+
+        for (const { url, detected } of uploaded) {
+          const colorName = (detected?.name ?? color).trim() || 'Uncategorised';
+          const colorHexVal = detected?.hex ?? colorHex;
+          let variant = workingVariants.find(v => v.name.trim().toLowerCase() === colorName.toLowerCase());
+          if (!variant) {
+            variant = { id: `variant-${Date.now()}-${Math.random().toString(16).slice(2)}`, name: colorName, hex: colorHexVal, images: [] };
+            workingVariants = [...workingVariants, variant];
+          }
+          if (!variant.images.includes(url)) {
+            workingVariants = workingVariants.map(v => v.id === variant!.id ? { ...v, images: [...v.images, url] } : v);
+          }
+          lastTouchedId = variant.id;
+        }
+
+        setColorVariants(workingVariants);
+        const finalVariant = workingVariants.find(v => v.id === lastTouchedId) ?? workingVariants[0];
+        if (finalVariant) {
+          setActiveColorVariantId(finalVariant.id);
+          setColor(finalVariant.name);
+          setColorHex(finalVariant.hex);
+          setImageGallery([...finalVariant.images]);
+        }
+
+        const distinctColors = Array.from(new Set(uploaded.map(u => u.detected?.name).filter(Boolean))) as string[];
+        setUploadStatusMsg(
+          distinctColors.length
+            ? `Uploaded ${uploaded.length} photo(s) and auto-sorted into ${distinctColors.length} colour group(s): ${distinctColors.join(', ')}.`
+            : `Uploaded ${uploaded.length} photo(s).`
+        );
+      } else {
+        const uploadedUrls = uploaded.map(u => u.url);
+        setImageGallery(prev => [...prev, ...uploadedUrls.filter(url => !prev.includes(url))]);
+        setUploadStatusMsg(`Successfully uploaded ${uploadedUrls.length} image(s).`);
+      }
+      setTimeout(() => setUploadStatusMsg(null), 4500);
     } catch (error) {
       console.error('Image upload failed:', error);
       setUploadStatusMsg('Image upload failed. Check Supabase Storage permissions and bucket configuration.');
@@ -194,7 +300,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   };
 
   // Bulk URL Adder (handles single URL or comma/newline separated URLs)
-  const handleAddImageUrls = () => {
+  const handleAddImageUrls = async () => {
     if (!imageUrlInput.trim()) return;
 
     const urls = imageUrlInput
@@ -202,16 +308,54 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       .map(u => u.trim())
       .filter(u => u.length > 0 && (u.startsWith('http://') || u.startsWith('https://')));
 
-    if (urls.length > 0) {
-      setUploadStatusMsg('External URLs are accepted for preview, but product images should be uploaded to Supabase Storage for production use.');
-      setImageGallery(prev => [...prev, ...urls]);
-      setImageUrlInput('');
-      setTimeout(() => setUploadStatusMsg(null), 4500);
-    } else {
+    if (urls.length === 0) {
       setUploadStatusMsg('Please enter valid image URLs starting with http:// or https://');
       setTimeout(() => setUploadStatusMsg(null), 4000);
+      return;
     }
+
+    setUploadStatusMsg('External URLs are accepted for preview, but product images should be uploaded to Supabase Storage for production use.');
+    setImageUrlInput('');
+
+    if (autoDetectColor) {
+      const detections = await Promise.all(urls.map(async (url) => {
+        try {
+          return { url, detected: await detectDominantColor(url) };
+        } catch (detectionError) {
+          console.warn('Colour auto-detection failed for a pasted URL, keeping it in the active colour group:', detectionError);
+          return { url, detected: null as { name: string; hex: string } | null };
+        }
+      }));
+
+      let workingVariants = [...colorVariants];
+      let lastTouchedId = activeColorVariantId;
+      for (const { url, detected } of detections) {
+        const colorName = (detected?.name ?? color).trim() || 'Uncategorised';
+        const colorHexVal = detected?.hex ?? colorHex;
+        let variant = workingVariants.find(v => v.name.trim().toLowerCase() === colorName.toLowerCase());
+        if (!variant) {
+          variant = { id: `variant-${Date.now()}-${Math.random().toString(16).slice(2)}`, name: colorName, hex: colorHexVal, images: [] };
+          workingVariants = [...workingVariants, variant];
+        }
+        if (!variant.images.includes(url)) {
+          workingVariants = workingVariants.map(v => v.id === variant!.id ? { ...v, images: [...v.images, url] } : v);
+        }
+        lastTouchedId = variant.id;
+      }
+      setColorVariants(workingVariants);
+      const finalVariant = workingVariants.find(v => v.id === lastTouchedId) ?? workingVariants[0];
+      if (finalVariant) {
+        setActiveColorVariantId(finalVariant.id);
+        setColor(finalVariant.name);
+        setColorHex(finalVariant.hex);
+        setImageGallery([...finalVariant.images]);
+      }
+    } else {
+      setImageGallery(prev => [...prev, ...urls.filter(url => !prev.includes(url))]);
+    }
+    setTimeout(() => setUploadStatusMsg(null), 4500);
   };
+
 
   // Image Reordering & Removal Controls
   const setCoverImage = (index: number) => {
@@ -261,6 +405,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       .split(/\n|,/)
       .map((line) => line.trim())
       .filter(Boolean);
+    saveActiveVariantImages();
+    const savedVariants = colorVariants.length
+      ? colorVariants.map(variant => variant.id === activeColorVariantId ? { ...variant, name: color.trim(), hex: colorHex.trim() || '#000000', images: imageGallery } : variant)
+      : [{ id: `variant-${Date.now()}`, name: color.trim(), hex: colorHex.trim() || '#000000', images: imageGallery }];
+    const allVariantImages = Array.from(new Set(savedVariants.flatMap(variant => variant.images)));
 
     if (!trimmedName) {
       setUploadStatusMsg('Please enter a product name.');
@@ -308,10 +457,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       subcategory: subcategory.trim(),
       price: parsedPrice,
       originalPrice: parsedOriginalPrice > 0 ? parsedOriginalPrice : undefined,
-      images: imageGallery,
+      images: allVariantImages,
       fabric: fabric.trim(),
       color: color.trim(),
       colorHex: colorHex.trim() || '#000000',
+      colorVariants: savedVariants,
       occasion: occasion.trim(),
       description: description.trim() || 'Exquisite handcrafted apparel tailored for the discerning connoisseur.',
       craftDetails: craftDetails.length ? craftDetails : ['Artisanal handloom craftsmanship'],
@@ -321,8 +471,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       stockCount: parsedStockCount,
       isBestSeller,
       isNewArrival,
-      isCustomizable,
-      customizationBasePrice: isCustomizable ? 1500 : 0,
+      isCustomizable: false,
+      customizationBasePrice: 0,
       rating: editingProduct ? editingProduct.rating : 5.0,
       reviewCount: editingProduct ? editingProduct.reviewCount : 1,
       reviews: editingProduct ? editingProduct.reviews : [],
@@ -352,6 +502,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setFabric(prod.fabric);
     setColor(prod.color);
     setColorHex(prod.colorHex);
+    const variants = prod.colorVariants?.length ? prod.colorVariants : [{ id: `variant-${prod.id}`, name: prod.color, hex: prod.colorHex, images: prod.images }];
+    setColorVariants(variants);
+    setActiveColorVariantId(variants[0].id);
+    setImageGallery([...variants[0].images]);
     setOccasion(prod.occasion);
     setDescription(prod.description);
     setCraftDetailsInput((prod.craftDetails ?? []).join('\n'));
@@ -361,7 +515,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setInStock(prod.inStock);
     setIsBestSeller(Boolean(prod.isBestSeller));
     setIsNewArrival(Boolean(prod.isNewArrival));
-    setIsCustomizable(Boolean(prod.isCustomizable));
     setShowAddProductModal(true);
   };
 
@@ -373,23 +526,22 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setSubcategory('Silk Sarees');
     setPrice(14500);
     setOriginalPrice(17000);
-    setImageGallery([
-      'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=1000&q=85'
-    ]);
+    setImageGallery([]);
     setImageUrlInput('');
     setFabric('Pure Mulberry Handloom Silk');
     setColor('Sand Gold');
     setColorHex('#D4AF37');
+    setColorVariants([{ ...initialColorVariant, images: [] }]);
+    setActiveColorVariantId(initialColorVariant.id);
     setOccasion('Weddings & Festive');
     setDescription('');
-    setCraftDetailsInput('Pure certified artisanal handloom weave\nCustom made-to-measure tailoring available');
+    setCraftDetailsInput('Pure certified artisanal handloom weave');
     setCareInstructions('Dry clean only. Store in muslin cloth.');
     setAvailableSizes('Free Size (6.2m with blouse)');
     setStockCount(10);
     setInStock(true);
     setIsBestSeller(false);
     setIsNewArrival(false);
-    setIsCustomizable(true);
     setShowAddProductModal(true);
   };
 
@@ -459,7 +611,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               <div>
                 <h2 className="font-serif italic text-2xl text-[#2A2A2A]">Brand Sign In</h2>
                 <p className="text-xs text-[#6B655E] mt-1 font-light">
-                  Access multi-image product uploader, live orders, and tailoring studio.
+                  Access the product catalog, live orders, and store settings.
                 </p>
               </div>
 
@@ -665,7 +817,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                           <th className="p-3">Product & Gallery</th>
                           <th className="p-3">Category</th>
                           <th className="p-3">Price</th>
-                          <th className="p-3">Bespoke Fit</th>
                           <th className="p-3">Stock</th>
                           <th className="p-3 text-right">Actions</th>
                         </tr>
@@ -699,15 +850,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                               </td>
                               <td className="p-3 uppercase text-[10px] font-medium text-[#6B655E]">{prod.category}</td>
                               <td className="p-3 font-bold text-[#2A2A2A]">₹{prod.price.toLocaleString('en-IN')}</td>
-                              <td className="p-3">
-                                {prod.isCustomizable ? (
-                                  <span className="px-2 py-0.5 bg-[#2A2A2A] text-white text-[9px] font-bold uppercase tracking-wider">
-                                    Enabled
-                                  </span>
-                                ) : (
-                                  <span className="text-[#6B655E] text-[10px]">Standard</span>
-                                )}
-                              </td>
                               <td className="p-3">
                                 <span className={`font-mono text-xs ${prod.stockCount > 0 ? 'text-[#2A2A2A]' : 'text-[#6B655E]'}`}>
                                   {prod.stockCount} in stock
@@ -768,7 +910,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         <tr>
                           <th className="p-3">Order Ref</th>
                           <th className="p-3">Client</th>
-                          <th className="p-3">Items & Tailoring</th>
+                          <th className="p-3">Items</th>
                           <th className="p-3">Amount</th>
                           <th className="p-3">Status Pipeline</th>
                           <th className="p-3 text-right">WhatsApp Update</th>
@@ -792,11 +934,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                                   {ord.items.map((it, i) => (
                                     <div key={i} className="text-[11px]">
                                       <span>{it.product.name} (x{it.quantity})</span>
-                                      {it.isCustomized && (
-                                        <span className="block text-[10px] text-[#A68A64] font-bold">
-                                          ↳ Bespoke: {it.customization?.blouseStyle || 'Tailored'}
-                                        </span>
-                                      )}
                                     </div>
                                   ))}
                                 </div>
@@ -854,7 +991,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                         className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 text-xs text-[#2A2A2A]"
                       />
                       <p className="text-[10px] text-[#6B655E] mt-1">
-                        All product inquiries, custom tailoring consultations, and order updates redirect to this number.
+                        Product inquiries and order updates redirect to this number.
                       </p>
                     </div>
                   </div>
@@ -938,6 +1075,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       <option value="ethnic">Ethnic</option>
                       <option value="western">Western</option>
                       <option value="accessories">Accessories</option>
+                      <option value="gifts">Gifts & Novelties</option>
                       <option value="custom">Custom</option>
                     </select>
                   </div>
@@ -1002,7 +1140,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     <div className="flex items-center gap-2">
                       <ImageIcon size={16} className="text-[#2A2A2A]" />
                       <label className="text-[10px] uppercase tracking-wider font-bold text-[#2A2A2A]">
-                        Product Image Gallery ({imageGallery.length} photo{imageGallery.length === 1 ? '' : 's'})
+                        {color} Image Gallery ({imageGallery.length} photo{imageGallery.length === 1 ? '' : 's'})
                       </label>
                     </div>
 
@@ -1016,6 +1154,20 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       </button>
                     )}
                   </div>
+
+                  <label className="flex items-center gap-2 text-[10px] text-[#2A2A2A] bg-[#F5F2ED] border border-[#DCD7D0] p-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={autoDetectColor}
+                      onChange={(e) => setAutoDetectColor(e.target.checked)}
+                    />
+                    <span>
+                      <span className="font-bold uppercase tracking-wider">Auto-detect colour & sort photos</span>
+                      <span className="block text-[#6B655E] normal-case font-normal mt-0.5">
+                        Upload photos of any colour together — each photo's dominant colour is detected and it is grouped into the matching colour variant automatically.
+                      </span>
+                    </span>
+                  </label>
 
                   {/* Drag & Drop Multi-Image Zone */}
                   <div
@@ -1031,7 +1183,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   >
                     <Upload size={22} className="mx-auto text-[#2A2A2A] mb-1.5" />
                     <p className="font-bold text-xs text-[#2A2A2A]">
-                      Drag & drop multiple product photos here
+                      {autoDetectColor ? 'Upload photos of all colours together' : `Upload one or many photos for ${color}`}
                     </p>
                     <p className="text-[10px] text-[#6B655E] mt-0.5">
                       or click to browse your computer (select multiple files: JPEG, PNG, WEBP)
@@ -1054,7 +1206,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     <div className="flex gap-2">
                       <input
                         type="text"
-                        placeholder="https://example.com/saree1.jpg, https://example.com/saree2.jpg"
+                        placeholder="Paste one or more image URLs"
                         value={imageUrlInput}
                         onChange={(e) => setImageUrlInput(e.target.value)}
                         className="flex-1 bg-[#F5F2ED] border border-[#DCD7D0] p-2 text-xs"
@@ -1215,6 +1367,84 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   </div>
                 </div>
 
+                {/* COLOR VARIANTS */}
+                <div className="bg-[#EAE5DF] p-4 border border-[#DCD7D0] space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-[10px] uppercase tracking-wider font-bold text-[#2A2A2A]">Colour Variants</h3>
+                      <p className="text-[10px] text-[#6B655E] mt-1">
+                        {autoDetectColor
+                          ? 'Auto-detect is on — colour groups are created automatically as photos are uploaded.'
+                          : 'Each colour keeps its own photos. Select a colour before uploading.'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addColorVariant}
+                      className="px-3 py-2 bg-[#2A2A2A] text-white text-[9px] uppercase tracking-wider font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus size={12} /> Add Colour
+                    </button>
+                  </div>
+
+                  {colorVariants.length > 0 && (
+                    <div className="space-y-2">
+                      {colorVariants.map((variant) => (
+                        <div key={variant.id} className={`flex items-center gap-2 p-2 border ${activeColorVariantId === variant.id ? 'border-[#2A2A2A] bg-[#F5F2ED]' : 'border-[#DCD7D0] bg-[#F5F2ED]'}`}>
+                          <button
+                            type="button"
+                            onClick={() => selectColorVariant(variant)}
+                            className="flex flex-1 items-center gap-2 text-left cursor-pointer min-w-0"
+                          >
+                            <span className="w-5 h-5 border border-[#DCD7D0] shrink-0" style={{ backgroundColor: variant.hex }} />
+                            <span className="truncate text-xs text-[#2A2A2A]">{variant.name}</span>
+                            <span className="text-[9px] text-[#6B655E] ml-auto shrink-0">{activeColorVariantId === variant.id ? imageGallery.length : variant.images.length} photo{(activeColorVariantId === variant.id ? imageGallery.length : variant.images.length) === 1 ? '' : 's'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeColorVariant(variant.id)}
+                            className="p-1 text-[#6B655E] hover:text-[#2A2A2A] cursor-pointer"
+                            title="Remove colour variant"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* ALL PHOTOS ACROSS COLOURS — lets the admin review every uploaded image regardless of which colour variant is active */}
+                {colorVariants.some(v => (v.id === activeColorVariantId ? imageGallery.length : v.images.length) > 0) && (
+                  <div className="bg-[#EAE5DF] p-4 border border-[#DCD7D0] space-y-3">
+                    <h3 className="text-[10px] uppercase tracking-wider font-bold text-[#2A2A2A]">
+                      All Photos Across Colours ({colorVariants.reduce((sum, v) => sum + (v.id === activeColorVariantId ? imageGallery.length : v.images.length), 0)} total)
+                    </h3>
+                    <div className="space-y-3">
+                      {colorVariants.map((variant) => {
+                        const images = variant.id === activeColorVariantId ? imageGallery : variant.images;
+                        if (images.length === 0) return null;
+                        return (
+                          <div key={variant.id} className="space-y-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-3.5 h-3.5 border border-[#DCD7D0] shrink-0" style={{ backgroundColor: variant.hex }} />
+                              <span className="text-[9px] uppercase tracking-wider font-bold text-[#2A2A2A]">{variant.name}</span>
+                              <span className="text-[9px] text-[#6B655E]">({images.length} photo{images.length === 1 ? '' : 's'})</span>
+                            </div>
+                            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+                              {images.map((img, i) => (
+                                <div key={i} className="w-full h-16 bg-[#F5F2ED] border border-[#DCD7D0] overflow-hidden">
+                                  <img src={img} alt={`${variant.name} view ${i + 1}`} className="w-full h-full object-cover" />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Available Sizes & Occasion */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -1271,18 +1501,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     placeholder="Dry clean only. Store in muslin cloth."
                     className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 text-xs text-[#2A2A2A]"
                   />
-                </div>
-
-                {/* Bespoke Tailoring Toggle */}
-                <div className="flex items-center gap-4 pt-1">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isCustomizable}
-                      onChange={(e) => setIsCustomizable(e.target.checked)}
-                    />
-                    <span className="font-bold text-[10px] uppercase tracking-wider text-[#2A2A2A]">Enable Bespoke Tailoring Option</span>
-                  </label>
                 </div>
 
                 {/* Save Actions */}

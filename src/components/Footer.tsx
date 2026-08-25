@@ -1,14 +1,12 @@
 import React, { useState } from 'react';
 import { MessageCircle, ShieldCheck, Truck, ArrowRight, Check } from 'lucide-react';
-import { generateWhatsAppLink } from '../utils/formatters';
+import { generateWhatsAppLink, STORE_WHATSAPP_NUMBER } from '../utils/formatters';
 
 interface FooterProps {
-  onOpenOrderLookup: () => void;
   onOpenAdmin: () => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({
-  onOpenOrderLookup,
   onOpenAdmin,
 }) => {
   const [newsletterEmail, setNewsletterEmail] = useState('');
@@ -22,7 +20,7 @@ export const Footer: React.FC<FooterProps> = ({
   };
 
   const handleDirectWhatsApp = () => {
-    const link = generateWhatsAppLink('8008889317', 'Namaste BhuviSri Enterprises! ✨ I would like styling assistance.');
+    const link = generateWhatsAppLink(STORE_WHATSAPP_NUMBER, 'Namaste BhuviSri Enterprises! ✨ I would like styling assistance.');
     window.open(link, '_blank');
   };
 
@@ -37,7 +35,7 @@ export const Footer: React.FC<FooterProps> = ({
               BhuviSri Enterprises
             </span>
             <p className="text-xs text-[#A89F91] max-w-md font-light leading-relaxed">
-              Curated heritage handloom sarees, bespoke festive couture, and modern silhouettes with precision made-to-measure tailoring.
+              Curated heritage handloom sarees, festive couture, and modern silhouettes crafted with care.
             </p>
           </div>
 
@@ -103,11 +101,6 @@ export const Footer: React.FC<FooterProps> = ({
                 <a href="mailto:bhuvisri.enterprises@gmail.com" className="hover:text-white transition-colors">
                   bhuvisri.enterprises@gmail.com
                 </a>
-              </li>
-              <li>
-                <button onClick={onOpenOrderLookup} className="hover:text-white transition-colors text-left cursor-pointer">
-                  Order Status & Tracking
-                </button>
               </li>
             </ul>
           </div>
