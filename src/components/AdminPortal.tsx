@@ -73,9 +73,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [name, setName] = useState('');
   const [tagline, setTagline] = useState('');
   const [category, setCategory] = useState<ProductCategory>('sarees');
-  const [subcategory, setSubcategory] = useState('Silk Sarees');
-  const [price, setPrice] = useState(14500);
-  const [originalPrice, setOriginalPrice] = useState(17000);
+  const [subcategory, setSubcategory] = useState('');
+  const [price, setPrice] = useState(0);
+  const [originalPrice, setOriginalPrice] = useState(0);
   
   // Multi-Image Upload State
   const [imageUrlInput, setImageUrlInput] = useState('');
@@ -85,23 +85,23 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const initialColorVariant: ProductColorVariant = {
     id: 'variant-new-1',
-    name: 'Sand Gold',
-    hex: '#D4AF37',
+    name: '',
+    hex: '#000000',
     images: [],
   };
   const [colorVariants, setColorVariants] = useState<ProductColorVariant[]>([initialColorVariant]);
   const [activeColorVariantId, setActiveColorVariantId] = useState<string | null>(initialColorVariant.id);
 
-  const [fabric, setFabric] = useState('Pure Mulberry Handloom Silk');
-  const [color, setColor] = useState('Sand Gold');
-  const [colorHex, setColorHex] = useState('#D4AF37');
-  const [occasion, setOccasion] = useState('Weddings & Festive');
+  const [fabric, setFabric] = useState('');
+  const [color, setColor] = useState('');
+  const [colorHex, setColorHex] = useState('#000000');
+  const [occasion, setOccasion] = useState('');
   const [description, setDescription] = useState('');
-  const [availableSizes, setAvailableSizes] = useState('Free Size (6.2m with blouse)');
+  const [availableSizes, setAvailableSizes] = useState('');
   // Retained (not editable in this form) so saving/editing a product doesn't wipe existing catalogue data.
   const [craftDetails, setCraftDetails] = useState<string[]>(['Artisanal handloom craftsmanship']);
   const [careInstructions, setCareInstructions] = useState('Dry clean only. Store in muslin cloth.');
-  const [stockCount, setStockCount] = useState(10);
+  const [stockCount, setStockCount] = useState(0);
   const [inStock, setInStock] = useState(true);
   const [isBestSeller, setIsBestSeller] = useState(false);
   const [isNewArrival, setIsNewArrival] = useState(false);
@@ -434,22 +434,22 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setName('');
     setTagline('');
     setCategory('sarees');
-    setSubcategory('Silk Sarees');
-    setPrice(14500);
-    setOriginalPrice(17000);
+    setSubcategory('');
+    setPrice(0);
+    setOriginalPrice(0);
     setImageGallery([]);
     setImageUrlInput('');
-    setFabric('Pure Mulberry Handloom Silk');
-    setColor('Sand Gold');
-    setColorHex('#D4AF37');
+    setFabric('');
+    setColor('');
+    setColorHex('#000000');
     setColorVariants([{ ...initialColorVariant, images: [] }]);
     setActiveColorVariantId(initialColorVariant.id);
-    setOccasion('Weddings & Festive');
+    setOccasion('');
     setDescription('');
     setCraftDetails(['Artisanal handloom craftsmanship']);
     setCareInstructions('Dry clean only. Store in muslin cloth.');
-    setAvailableSizes('Free Size (6.2m with blouse)');
-    setStockCount(10);
+    setAvailableSizes('');
+    setStockCount(0);
     setInStock(true);
     setIsBestSeller(false);
     setIsNewArrival(false);
@@ -1020,8 +1020,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     <input
                       type="number"
                       required
-                      value={price}
+                      value={price || ''}
                       onChange={(e) => setPrice(Number(e.target.value))}
+                      placeholder="e.g. 14500"
                       className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2 text-xs font-mono"
                     />
                   </div>
@@ -1029,8 +1030,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     <label className="block text-[10px] uppercase tracking-wider font-bold text-[#6B655E] mb-1">Original Price (₹)</label>
                     <input
                       type="number"
-                      value={originalPrice}
+                      value={originalPrice || ''}
                       onChange={(e) => setOriginalPrice(Number(e.target.value))}
+                      placeholder="e.g. 17000"
                       className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2 text-xs font-mono"
                     />
                   </div>
@@ -1038,8 +1040,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     <label className="block text-[10px] uppercase tracking-wider font-bold text-[#6B655E] mb-1">Inventory (Units)</label>
                     <input
                       type="number"
-                      value={stockCount}
+                      value={stockCount || ''}
                       onChange={(e) => setStockCount(Number(e.target.value))}
+                      placeholder="e.g. 10"
                       className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2 text-xs font-mono"
                     />
                   </div>
