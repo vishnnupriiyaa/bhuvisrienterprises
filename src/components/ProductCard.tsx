@@ -173,21 +173,37 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             {product.tagline}
           </p>
 
-          {/* Colour Variant Swatches */}
+          {/* Colour Variant Thumbnails — Myntra-style "also available in" strip */}
           {colorVariants.length > 1 && (
-            <div className="flex items-center gap-1.5 mt-2">
-              {colorVariants.map((variant) => (
-                <button
-                  key={variant.id}
-                  type="button"
-                  onClick={(e) => handleSwatchSelect(e, variant.id)}
-                  title={variant.name}
-                  className={`w-4 h-4 rounded-full border transition-all cursor-pointer ${
-                    activeVariantId === variant.id ? 'ring-2 ring-offset-1 ring-[#2A2A2A] border-[#2A2A2A]' : 'border-[#DCD7D0]'
-                  }`}
-                  style={{ backgroundColor: variant.hex }}
-                />
-              ))}
+            <div className="mt-2">
+              <div className="flex items-center gap-1.5">
+                {colorVariants.slice(0, 4).map((variant) => {
+                  const thumb = variant.images[0] || product.images[0];
+                  return (
+                    <button
+                      key={variant.id}
+                      type="button"
+                      onClick={(e) => handleSwatchSelect(e, variant.id)}
+                      title={variant.name}
+                      className={`w-7 h-7 shrink-0 border overflow-hidden transition-all cursor-pointer ${
+                        activeVariantId === variant.id ? 'ring-2 ring-offset-1 ring-[#2A2A2A] border-[#2A2A2A]' : 'border-[#DCD7D0]'
+                      }`}
+                    >
+                      {thumb ? (
+                        <img src={thumb} alt={variant.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="block w-full h-full" style={{ backgroundColor: variant.hex }} />
+                      )}
+                    </button>
+                  );
+                })}
+                {colorVariants.length > 4 && (
+                  <span className="text-[9px] text-[#6B655E] font-bold">+{colorVariants.length - 4}</span>
+                )}
+              </div>
+              <p className="text-[9px] uppercase tracking-wider text-[#6B655E] mt-1">
+                {colorVariants.length} Colours Available
+              </p>
             </div>
           )}
         </div>
