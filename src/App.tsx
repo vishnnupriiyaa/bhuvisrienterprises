@@ -535,12 +535,14 @@ export default function App() {
   };
 
   const handleUpdateProduct = async (updatedProd: Product): Promise<boolean> => {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('products')
       .update(getSupabaseProductPayload(updatedProd))
-      .eq('id', updatedProd.id);
+      .eq('id', updatedProd.id)
+      .select('id')
+      .maybeSingle();
 
-    if (error) {
+    if (error || !data) {
       console.error('Failed to update product:', error);
       return false;
     }
