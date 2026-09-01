@@ -31,8 +31,8 @@ interface AdminPortalProps {
   onClose: () => void;
   products: Product[];
   orders: Order[];
-  onAddProduct: (product: Product) => void;
-  onUpdateProduct: (product: Product) => void;
+  onAddProduct: (product: Product) => Promise<boolean>;
+  onUpdateProduct: (product: Product) => Promise<boolean>;
   onDeleteProduct: (productId: string) => void;
   onUpdateOrderStatus: (orderId: string, newStatus: OrderStatus, trackingNumber?: string, courierPartner?: string) => void;
   isAdminLoggedIn: boolean;
@@ -68,6 +68,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productSearch, setProductSearch] = useState('');
+  const [showDeactivated, setShowDeactivated] = useState(false);
 
   // New Product Form State
   const [name, setName] = useState('');
@@ -97,10 +98,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [colorHex, setColorHex] = useState('#000000');
   const [occasion, setOccasion] = useState('');
   const [description, setDescription] = useState('');
+  const [craftDetails, setCraftDetails] = useState<string[]>([]);
+  const [careInstructions, setCareInstructions] = useState('');
   const [availableSizes, setAvailableSizes] = useState('');
-  // Retained (not editable in this form) so saving/editing a product doesn't wipe existing catalogue data.
-  const [craftDetails, setCraftDetails] = useState<string[]>(['Artisanal handloom craftsmanship']);
-  const [careInstructions, setCareInstructions] = useState('Dry clean only. Store in muslin cloth.');
   const [stockCount, setStockCount] = useState(0);
   const [inStock, setInStock] = useState(true);
   const [isBestSeller, setIsBestSeller] = useState(false);
@@ -127,7 +127,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     saveActiveVariantImages();
     const variant: ProductColorVariant = {
       id: `variant-${Date.now()}`,
-      name: `Colour ${colorVariants.length + 1}`,
+      name: '',
       hex: '#D4AF37',
       images: [],
     };
@@ -304,7 +304,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     }
   };
 
-  const handleSaveProduct = (e: React.FormEvent) => {
+  const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const trimmedName = name.trim();
@@ -316,7 +316,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean);
-    saveActiveVariantImages();
     const savedVariants = colorVariants.length
       ? colorVariants.map(variant => variant.id === activeColorVariantId ? { ...variant, name: color.trim(), hex: colorHex.trim() || '#000000', images: imageGallery } : variant)
       : [{ id: `variant-${Date.now()}`, name: color.trim(), hex: colorHex.trim() || '#000000', images: imageGallery }];
@@ -374,10 +373,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       colorHex: colorHex.trim() || '#000000',
       colorVariants: savedVariants,
       occasion: occasion.trim(),
-      description: description.trim() || 'Exquisite handcrafted apparel tailored for the discerning connoisseur.',
-      craftDetails: craftDetails.length ? craftDetails : ['Artisanal handloom craftsmanship'],
-      careInstructions: careInstructions.trim() || 'Dry clean only. Store in muslin cloth.',
-      availableSizes: normalizedSizes.length ? normalizedSizes : ['Free Size'],
+      description: description.trim(),
+      craftDetails: craftDetails.length ? craftDetails : [],
+      careInstructions: careInstructions.trim(),
+      availableSizes: normalizedSizes,
       inStock: inStock && parsedStockCount > 0,
       stockCount: parsedStockCount,
       isBestSeller,
@@ -390,10 +389,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       isActive: true,
     };
 
-    if (editingProduct) {
-      onUpdateProduct(productPayload);
-    } else {
-      onAddProduct(productPayload);
+    const saved = editingProduct
+      ? await onUpdateProduct(productPayload)
+      : await onAddProduct(productPayload);
+
+    if (!saved) {
+      setUploadStatusMsg('Product could not be saved. Check your admin permissions and try again.');
+      return;
     }
 
     setShowAddProductModal(false);
@@ -419,8 +421,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setImageGallery([...variants[0].images]);
     setOccasion(prod.occasion);
     setDescription(prod.description);
-    setCraftDetails(prod.craftDetails ?? ['Artisanal handloom craftsmanship']);
-    setCareInstructions(prod.careInstructions || 'Dry clean only. Store in muslin cloth.');
+    setCraftDetails(prod.craftDetails ?? []);
+    setCareInstructions(prod.careInstructions || '');
     setAvailableSizes(prod.availableSizes.join(', '));
     setStockCount(prod.stockCount);
     setInStock(prod.inStock);
@@ -446,8 +448,8 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setActiveColorVariantId(initialColorVariant.id);
     setOccasion('');
     setDescription('');
-    setCraftDetails(['Artisanal handloom craftsmanship']);
-    setCareInstructions('Dry clean only. Store in muslin cloth.');
+    setCraftDetails([]);
+    setCareInstructions('');
     setAvailableSizes('');
     setStockCount(0);
     setInStock(true);
@@ -720,6 +722,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     </button>
                   </div>
 
+                  <label className="flex items-center gap-2 text-[10px] uppercase tracking-wider font-bold text-[#6B655E] cursor-pointer">
+                    <input type="checkbox" checked={showDeactivated} onChange={(e) => setShowDeactivated(e.target.checked)} />
+                    Show deactivated products
+                  </label>
+
                   {/* Products Table */}
                   <div className="bg-[#EAE5DF] border border-[#DCD7D0] overflow-x-auto">
                     <table className="w-full text-left text-xs">
@@ -734,9 +741,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       </thead>
                       <tbody className="divide-y divide-[#DCD7D0]">
                         {products
+                          .filter((p) => showDeactivated || p.isActive !== false)
                           .filter((p) => p.name.toLowerCase().includes(productSearch.toLowerCase()) || p.category.includes(productSearch.toLowerCase()) || p.sku.toLowerCase().includes(productSearch.toLowerCase()))
                           .map((prod) => (
-                            <tr key={prod.id} className="hover:bg-[#F5F2ED] transition-colors">
+                            <tr key={prod.id} className={`hover:bg-[#F5F2ED] transition-colors ${prod.isActive === false ? 'opacity-50' : ''}`}>
                               <td className="p-3">
                                 <div className="flex items-center gap-3">
                                   <div className="relative">
@@ -752,7 +760,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                                     )}
                                   </div>
                                   <div>
-                                    <span className="font-bold text-[#2A2A2A] block">{prod.name}</span>
+                                    <span className="font-bold text-[#2A2A2A] block">
+                                      {prod.name}
+                                      {prod.isActive === false && (
+                                        <span className="ml-2 px-1.5 py-0.5 bg-[#6B655E] text-white text-[8px] uppercase font-bold tracking-wider align-middle">Deactivated</span>
+                                      )}
+                                    </span>
                                     <span className="text-[10px] text-[#6B655E] font-mono">
                                       {prod.sku} • {prod.fabric} • {prod.images.length} photo{prod.images.length > 1 ? 's' : ''}
                                     </span>
@@ -775,13 +788,27 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                                   >
                                     <Edit3 size={13} />
                                   </button>
-                                  <button
-                                    onClick={() => onDeleteProduct(prod.id)}
-                                    className="p-1.5 text-[#6B655E] hover:text-[#2A2A2A] cursor-pointer"
-                                    title="Delete Product"
-                                  >
-                                    <Trash2 size={13} />
-                                  </button>
+                                  {prod.isActive === false ? (
+                                    <button
+                                      onClick={() => onUpdateProduct({ ...prod, isActive: true })}
+                                      className="p-1.5 text-[#2A2A2A] hover:bg-[#DCD7D0] cursor-pointer"
+                                      title="Restore Product"
+                                    >
+                                      <CheckCircle2 size={13} />
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => {
+                                        if (window.confirm(`Deactivate "${prod.name}"? It will be hidden from the storefront but can be restored later.`)) {
+                                          onDeleteProduct(prod.id);
+                                        }
+                                      }}
+                                      className="p-1.5 text-[#6B655E] hover:text-[#2A2A2A] cursor-pointer"
+                                      title="Delete Product"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -940,9 +967,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   <h2 className="font-serif italic text-2xl text-[#2A2A2A]">
                     {editingProduct ? 'Edit Product & Gallery' : 'Upload New Product'}
                   </h2>
-                  <p className="text-[10px] text-[#6B655E] uppercase tracking-wider">
-                    Add multi-angle photos, saree pallu close-ups, and fabric details
-                  </p>
                 </div>
                 <button onClick={() => setShowAddProductModal(false)} className="p-1 text-[#2A2A2A] hover:opacity-60 cursor-pointer">
                   <X size={20} />
@@ -958,7 +982,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     required
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Amber Kanjeevaram Handloom Silk Saree"
+                    placeholder=""
                     className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 text-xs text-[#2A2A2A]"
                   />
                 </div>
@@ -969,7 +993,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     type="text"
                     value={tagline}
                     onChange={(e) => setTagline(e.target.value)}
-                    placeholder="e.g. Pure mulberry silk with antique gold zari border"
+                    placeholder=""
                     className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 text-xs text-[#2A2A2A]"
                   />
                 </div>
@@ -996,7 +1020,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       type="text"
                       value={subcategory}
                       onChange={(e) => setSubcategory(e.target.value)}
-                      placeholder="e.g. Silk Sarees / Anarkalis"
+                      placeholder=""
                       className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2 text-xs"
                     />
                   </div>
@@ -1022,7 +1046,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       required
                       value={price || ''}
                       onChange={(e) => setPrice(Number(e.target.value))}
-                      placeholder="e.g. 14500"
+                      placeholder=""
                       className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2 text-xs font-mono"
                     />
                   </div>
@@ -1032,7 +1056,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       type="number"
                       value={originalPrice || ''}
                       onChange={(e) => setOriginalPrice(Number(e.target.value))}
-                      placeholder="e.g. 17000"
+                      placeholder=""
                       className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2 text-xs font-mono"
                     />
                   </div>
@@ -1042,7 +1066,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       type="number"
                       value={stockCount || ''}
                       onChange={(e) => setStockCount(Number(e.target.value))}
-                      placeholder="e.g. 10"
+                      placeholder=""
                       className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2 text-xs font-mono"
                     />
                   </div>
@@ -1083,10 +1107,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   >
                     <Upload size={22} className="mx-auto text-[#2A2A2A] mb-1.5" />
                     <p className="font-bold text-xs text-[#2A2A2A]">
-                      Upload one or many photos for {color}
-                    </p>
-                    <p className="text-[10px] text-[#6B655E] mt-0.5">
-                      or click to browse your computer (select multiple files: JPEG, PNG, WEBP)
+                      Upload product photos
                     </p>
                     <input
                       ref={fileInputRef}
@@ -1101,7 +1122,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   {/* Bulk / Single URL Input */}
                   <div>
                     <label className="block text-[9px] uppercase tracking-wider text-[#6B655E] mb-1 font-bold">
-                      Or Add by URL(s) (Paste single or multiple comma/newline separated URLs):
+                      Add image URLs
                     </label>
                     <div className="flex gap-2">
                       <input
@@ -1133,7 +1154,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   {imageGallery.length > 0 ? (
                     <div className="pt-2 space-y-2">
                       <span className="block text-[9px] uppercase tracking-wider text-[#6B655E] font-bold">
-                        Attached Images (First photo is Primary Cover):
+                        Attached Images
                       </span>
 
                       <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3">
@@ -1211,7 +1232,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     </div>
                   ) : (
                     <div className="p-3 bg-[#F5F2ED] border border-[#DCD7D0] text-center text-[#6B655E] text-[10px]">
-                      No photos attached. Upload at least 1 image for the product cover.
+                      No photos attached
                     </div>
                   )}
                 </div>
@@ -1224,7 +1245,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       type="text"
                       value={fabric}
                       onChange={(e) => setFabric(e.target.value)}
-                      placeholder="e.g. Pure Mulberry Handloom Silk"
+                      placeholder=""
                       className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2 text-xs"
                     />
                   </div>
@@ -1234,30 +1255,13 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       type="text"
                       value={color}
                       onChange={(e) => setColor(e.target.value)}
-                      placeholder="e.g. Sand Gold / Royal Ruby"
+                      placeholder=""
                       className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2 text-xs"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[10px] uppercase tracking-wider font-bold text-[#6B655E] mb-1">Color Hex</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={colorHex}
-                        onChange={(e) => setColorHex(e.target.value)}
-                        className="w-12 h-10 bg-transparent border border-[#DCD7D0] p-0.5"
-                      />
-                      <input
-                        type="text"
-                        value={colorHex}
-                        onChange={(e) => setColorHex(e.target.value)}
-                        className="flex-1 bg-[#F5F2ED] border border-[#DCD7D0] p-2 text-xs"
-                      />
-                    </div>
-                  </div>
                   <div>
                     <label className="block text-[10px] uppercase tracking-wider font-bold text-[#6B655E] mb-1">In Stock</label>
                     <label className="flex items-center gap-2 h-10 px-3 border border-[#DCD7D0] bg-[#F5F2ED] text-xs">
@@ -1272,7 +1276,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <h3 className="text-[10px] uppercase tracking-wider font-bold text-[#2A2A2A]">Colour Variants</h3>
-                      <p className="text-[10px] text-[#6B655E] mt-1">Each colour keeps its own photos. Select a colour before uploading.</p>
                     </div>
                     <button
                       type="button"
@@ -1349,7 +1352,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       type="text"
                       value={availableSizes}
                       onChange={(e) => setAvailableSizes(e.target.value)}
-                      placeholder="Free Size (6.2m), XS, S, M, L, XL"
+                      placeholder=""
                       className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2 text-xs"
                     />
                   </div>
@@ -1359,7 +1362,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                       type="text"
                       value={occasion}
                       onChange={(e) => setOccasion(e.target.value)}
-                      placeholder="e.g. Weddings, Sangeet, Festive"
+                      placeholder=""
                       className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2 text-xs"
                     />
                   </div>
@@ -1372,7 +1375,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                     rows={3}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Artisanal details, drape feel, blouse piece inclusion..."
+                    placeholder=""
                     className="w-full bg-[#F5F2ED] border border-[#DCD7D0] p-2.5 text-xs text-[#2A2A2A]"
                   />
                 </div>

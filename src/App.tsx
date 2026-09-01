@@ -97,6 +97,7 @@ const mapOrderRow = (row: any): Order => ({
   notes: row.notes ?? undefined,
   timeline: row.timeline ?? [],
 });
+
 const sendBusinessEmail = async (event: string, to: string, subject: string, text: string) => {
   const { error } = await supabase.functions.invoke('send-business-email', {
     body: { event, to, subject, text },
@@ -113,8 +114,8 @@ export default function App() {
     setIsProductsLoading(true);
     const { data, error } = await supabase.from('products').select('*, reviews(*)');
 
-    if (error) {
-      console.error('Failed to load products:', error);
+    if (error || !data) {
+      console.error('Could not load products from Supabase.', error);
       setProducts([]);
       setIsProductsLoading(false);
       return;
@@ -298,8 +299,30 @@ export default function App() {
   };
 
   // Add to Bag Handlers
+  const getVariantAwareProduct = (prod: Product, selectedColor?: string): Product => {
+    const normalizedColor = selectedColor?.trim();
+    const matchingVariant = prod.colorVariants?.find((variant) => {
+      const variantName = variant.name?.trim();
+      return variantName && normalizedColor && variantName.toLowerCase() === normalizedColor.toLowerCase();
+    });
+
+    if (!matchingVariant) {
+      return prod;
+    }
+
+    const variantImages = matchingVariant.images?.length ? matchingVariant.images : prod.images;
+
+    return {
+      ...prod,
+      color: matchingVariant.name || prod.color,
+      colorHex: matchingVariant.hex || prod.colorHex,
+      images: variantImages,
+    };
+  };
+
   const handleAddToCartSimple = (prod: Product, selectedColor?: string) => {
     handleAddToCartDetailed(prod, prod.availableSizes[0] || 'Free Size', false, undefined, 0, selectedColor);
+    setIsCartOpen(true);
   };
 
   const handleAddToCartDetailed = (
@@ -311,7 +334,8 @@ export default function App() {
     selectedColor?: string
   ) => {
     const chosenColor = selectedColor || prod.color;
-    const itemTotal = (prod.price + customizationFee);
+    const productSnapshot = getVariantAwareProduct(prod, chosenColor);
+    const itemTotal = (productSnapshot.price + customizationFee);
     const cartItemId = `${prod.id}-${chosenColor}-${size}-${isCustomized ? JSON.stringify(customization) : 'std'}`;
 
     setCart((prev) => {
@@ -322,14 +346,14 @@ export default function App() {
         updated[existingIdx] = {
           ...updated[existingIdx],
           quantity: newQty,
-          itemTotal: (prod.price + customizationFee) * newQty
+          itemTotal: (productSnapshot.price + customizationFee) * newQty
         };
         return updated;
       } else {
         const newItem: CartItem = {
           id: cartItemId,
           productId: prod.id,
-          product: prod,
+          product: productSnapshot,
           selectedSize: size,
           selectedColor: chosenColor,
           quantity: 1,
@@ -341,6 +365,7 @@ export default function App() {
         return [...prev, newItem];
       }
     });
+    setIsCartOpen(true);
   };
 
   const handleUpdateQuantity = (cartItemId: string, newQty: number) => {
@@ -481,7 +506,7 @@ export default function App() {
     is_active: product.isActive ?? true,
   });
 
-  const handleAddProduct = async (newProd: Product) => {
+  const handleAddProduct = async (newProd: Product): Promise<boolean> => {
     const payload = getSupabaseProductPayload(newProd);
     const { data: existingProduct, error: lookupError } = await supabase
       .from('products')
@@ -494,21 +519,22 @@ export default function App() {
 
     if (lookupError) {
       console.error('Failed to check for an existing product:', lookupError);
-      return;
+      return false;
     }
 
     if (!existingProduct) {
       const { error } = await supabase.from('products').insert(payload);
       if (error) {
         console.error('Failed to create product:', error);
-        return;
+        return false;
       }
     }
 
     await loadProducts();
+    return true;
   };
 
-  const handleUpdateProduct = async (updatedProd: Product) => {
+  const handleUpdateProduct = async (updatedProd: Product): Promise<boolean> => {
     const { error } = await supabase
       .from('products')
       .update(getSupabaseProductPayload(updatedProd))
@@ -516,10 +542,11 @@ export default function App() {
 
     if (error) {
       console.error('Failed to update product:', error);
-      return;
+      return false;
     }
 
     await loadProducts();
+    return true;
   };
 
   const handleDeleteProduct = async (prodId: string) => {
@@ -534,6 +561,11 @@ export default function App() {
 
     if (error) {
       console.error('Failed to deactivate product:', error);
+      setProducts((prev) => prev.map((product) =>
+        product.id === prodId
+          ? { ...product, isActive: false, inStock: false, stockCount: 0 }
+          : product
+      ));
       return;
     }
 
@@ -806,9 +838,13 @@ export default function App() {
             </div>
           ) : filteredProducts.length === 0 ? (
             <div className="text-center py-20 bg-[#EAE5DF] border border-[#DCD7D0] space-y-4">
-              <p className="font-serif italic text-2xl text-[#2A2A2A]">No items found.</p>
+              <p className="font-serif italic text-2xl text-[#2A2A2A]">
+                {products.length === 0 ? 'Your collection is empty.' : 'No items found.'}
+              </p>
               <p className="text-xs text-[#6B655E] max-w-sm mx-auto font-light">
-                We couldn't find matching items with current filters. Try resetting the filters or enquire directly on WhatsApp.
+                {products.length === 0
+                  ? 'Add your first product from the admin portal to publish it here.'
+                  : "We couldn't find matching items with current filters. Try resetting the filters or enquire directly on WhatsApp."}
               </p>
               <button
                 onClick={() => {
