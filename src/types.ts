@@ -81,6 +81,50 @@ export interface CartItem {
   itemTotal: number;
 }
 
+export type ShipmentStatus = 
+  | 'ORDER_PLACED'
+  | 'PAYMENT_CONFIRMED'
+  | 'PROCESSING'
+  | 'PACKED'
+  | 'SHIPPED'
+  | 'IN_TRANSIT'
+  | 'OUT_FOR_DELIVERY'
+  | 'DELIVERED'
+  | 'DELIVERY_ATTEMPTED'
+  | 'DELAYED'
+  | 'CANCELLED'
+  | 'RETURNED'
+  | 'REFUNDED';
+
+export interface TrackingEvent {
+  id: string;
+  shipmentId: string;
+  status: ShipmentStatus;
+  location?: string;
+  description: string;
+  timestamp: string;
+  carrierRawData?: Record<string, any>;
+}
+
+export interface Shipment {
+  id: string;
+  orderId: string;
+  shipmentNumber: string;
+  trackingNumber: string;
+  carrier: string; // 'fedex', 'dhl', 'ups', 'india-post', 'xpressbees', etc.
+  shippingMethod: string; // 'standard', 'express', 'overnight'
+  shipmentStatus: ShipmentStatus;
+  originLocation?: string;
+  currentLocation?: string;
+  destinationLocation?: string;
+  estimatedDeliveryDate?: string;
+  actualDeliveryDate?: string;
+  carrierTrackingUrl?: string;
+  trackingEvents: TrackingEvent[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type OrderStatus = 'Order Placed' | 'Crafting & Stitching' | 'Quality Inspection' | 'Dispatched' | 'Delivered' | 'Cancelled';
 
 export interface CustomerDetails {
@@ -119,6 +163,8 @@ export interface Order {
     description: string;
     completed: boolean;
   }[];
+  shipmentId?: string;
+  shipment?: Shipment;
 }
 
 export interface UserProfile {
