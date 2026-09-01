@@ -2,6 +2,19 @@ import { supabase } from './supabase';
 import { Shipment, TrackingEvent, ShipmentStatus } from '../types';
 
 /**
+ * Send shipment email notifications
+ */
+const sendShipmentEmail = async (event: string, to: string, subject: string, text: string) => {
+  try {
+    await supabase.functions.invoke('send-business-email', {
+      body: { event, to, subject, text },
+    });
+  } catch (error) {
+    // Silently fail - don't block shipment operations
+  }
+};
+
+/**
  * Shipment Service - Handles shipment creation, tracking, and status updates
  */
 
@@ -44,6 +57,22 @@ export const shipmentService = {
         .from('orders')
         .update({ shipment_id: data.id, tracking_number: trackingNumber, courier_partner: carrier })
         .eq('id', orderId);
+
+      // Fetch order to get customer email and send notification
+      const { data: order } = await supabase
+        .from('orders')
+        .select('customer_email, order_number')
+        .eq('id', orderId)
+        .single();
+
+      if (order?.customer_email) {
+        await sendShipmentEmail(
+          'shipment_created',
+          order.customer_email,
+          `Your shipment is on the way - ${order.order_number}`,
+          `Your order ${order.order_number} has been shipped! Tracking number: ${trackingNumber}. Carrier: ${carrier}. You can track your shipment at www.bhuvisrienterprises.com/track`
+        );
+      }
 
       return this.mapShipmentRow(data);
     } catch (error) {
@@ -193,6 +222,38 @@ export const shipmentService = {
         .update(updateData)
         .eq('id', shipmentId);
 
+      if (!error) {
+        // Send email for major status changes
+        if (['OUT_FOR_DELIVERY', 'DELIVERED'].includes(status)) {
+          const { data: shipment } = await supabase
+            .from('shipments')
+            .select('order_id')
+            .eq('id', shipmentId)
+            .single();
+
+          if (shipment) {
+            const { data: order } = await supabase
+              .from('orders')
+              .select('customer_email, order_number')
+              .eq('id', shipment.order_id)
+              .single();
+
+            if (order?.customer_email) {
+              const statusText = status === 'OUT_FOR_DELIVERY' 
+                ? 'Out for Delivery - Your order is on its way to you!'
+                : 'Delivered - Your order has been delivered!';
+              
+              await sendShipmentEmail(
+                `shipment_${status.toLowerCase()}`,
+                order.customer_email,
+                statusText,
+                `Your order ${order.order_number} is now ${status.replace('_', ' ').toLowerCase()}. Track it at www.bhuvisrienterprises.com/track`
+              );
+            }
+          }
+        }
+      }
+
       return !error;
     } catch (error) {
       return false;
@@ -217,6 +278,30 @@ export const shipmentService = {
 
       if (!error) {
         await this.addTrackingEvent(shipmentId, 'DELIVERED', undefined, 'Package delivered successfully');
+        
+        // Send delivery confirmation email
+        const { data: shipment } = await supabase
+          .from('shipments')
+          .select('order_id')
+          .eq('id', shipmentId)
+          .single();
+
+        if (shipment) {
+          const { data: order } = await supabase
+            .from('orders')
+            .select('customer_email, order_number')
+            .eq('id', shipment.order_id)
+            .single();
+
+          if (order?.customer_email) {
+            await sendShipmentEmail(
+              'shipment_delivered',
+              order.customer_email,
+              `Delivery Confirmed - Order ${order.order_number}`,
+              `Great news! Your order ${order.order_number} has been delivered. Thank you for shopping with BhuviSri Enterprises!`
+            );
+          }
+        }
       }
 
       return !error;
